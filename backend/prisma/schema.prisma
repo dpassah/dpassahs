@@ -1,0 +1,44 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Org {
+  orgId         String    @id @map("org_id") @db.VarChar(64)
+  orgName       String    @map("org_name") @db.VarChar(255)
+  orgNameFull   String    @map("org_name_full") @db.VarChar(255)
+  orgType       String    @map("org_type") @db.VarChar(128)
+  contactName   String?   @map("contact_name") @db.VarChar(255)
+  contactEmail  String    @map("contact_email") @db.VarChar(255)
+  contactPhone  String?   @map("contact_phone") @db.VarChar(64)
+  createdAt     BigInt    @map("created_at")
+  projects      Project[]
+
+  @@map("orgs")
+}
+
+model Project {
+  id         String  @id @db.VarChar(64)
+  orgId      String  @map("org_id") @db.VarChar(64)
+  bailleur   String  @db.VarChar(255)
+  startDate  DateTime @map("start_date") @db.Date
+  endDate    DateTime @map("end_date") @db.Date
+  type       String  @db.VarChar(64)
+  sector     String  @db.VarChar(128)
+  location   String  @db.Text
+  createdAt  BigInt  @map("created_at")
+  org        Org     @relation(fields: [orgId], references: [orgId], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("projects")
+}
