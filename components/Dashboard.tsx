@@ -205,46 +205,46 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
           const metaHtml =
             !p.beneficiariesType &&
-            !p.beneficiariesPlanned &&
-            !p.activitiesPlanned &&
-            !p.projectManagerName &&
-            !p.projectManagerPhone &&
-            !p.projectManagerEmail
+              !p.beneficiariesPlanned &&
+              !p.activitiesPlanned &&
+              !p.projectManagerName &&
+              !p.projectManagerPhone &&
+              !p.projectManagerEmail
               ? '<p style="margin:4px 0 0 0;font-size:11px;color:#6b7280;">Aucun détail renseigné.</p>'
               :
-                '<div style="margin:4px 0 0 0;font-size:11px;color:#111827;">' +
-                // Bloc structuré basé sur les nouveaux champs du projet
-                (p.beneficiariesType
-                  ? renderLine('Type de bénéficiaires', p.beneficiariesType)
-                  : '') +
-                (typeof p.beneficiariesPlanned === 'number'
-                  ? renderLine(
-                      'Bénéficiaires prévus',
-                      p.beneficiariesPlanned.toLocaleString('fr-FR'),
-                    )
-                  : '') +
-                (typeof p.activitiesPlanned === 'number'
-                  ? renderLine(
-                      "Nombre d'activités prévues",
-                      p.activitiesPlanned.toLocaleString('fr-FR'),
-                    )
-                  : '') +
-                (p.projectManagerName
-                  ? renderLine('Chef de projet', p.projectManagerName)
-                  : '') +
-                (p.projectManagerPhone
-                  ? renderLine('Tél. chef de projet', p.projectManagerPhone)
-                  : '') +
-                (p.projectManagerEmail
-                  ? renderLine('Email chef de projet', p.projectManagerEmail)
-                  : '') +
-                '</div>';
+              '<div style="margin:4px 0 0 0;font-size:11px;color:#111827;">' +
+              // Bloc structuré basé sur les nouveaux champs du projet
+              (p.beneficiariesType
+                ? renderLine('Type de bénéficiaires', p.beneficiariesType)
+                : '') +
+              (typeof p.beneficiariesPlanned === 'number'
+                ? renderLine(
+                  'Bénéficiaires prévus',
+                  p.beneficiariesPlanned.toLocaleString('fr-FR'),
+                )
+                : '') +
+              (typeof p.activitiesPlanned === 'number'
+                ? renderLine(
+                  "Nombre d'activités prévues",
+                  p.activitiesPlanned.toLocaleString('fr-FR'),
+                )
+                : '') +
+              (p.projectManagerName
+                ? renderLine('Chef de projet', p.projectManagerName)
+                : '') +
+              (p.projectManagerPhone
+                ? renderLine('Tél. chef de projet', p.projectManagerPhone)
+                : '') +
+              (p.projectManagerEmail
+                ? renderLine('Email chef de projet', p.projectManagerEmail)
+                : '') +
+              '</div>';
 
           // Construire le bloc bas: Description du projet (paragraphe) + Activités (titre + liste numérotée)
           const descriptionHtml = p.projectDescription
             ? `<p style="margin:4px 0 0 0;font-size:11px;color:#374151;white-space:pre-wrap;text-align:justify;line-height:1.5;">${escapeHtml(
-                `Description du projet: ${p.projectDescription}`,
-              )}</p>`
+              `Description du projet: ${p.projectDescription}`,
+            )}</p>`
             : '';
 
           const totalBeneficiariesRecorded = activitiesList.reduce<number>((sum, a) => {
@@ -269,11 +269,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             const headerHtml = `<p style="margin:4px 0 2px 0;font-size:11px;color:#374151;"><strong>Activités du projet (${activitiesList.length})</strong></p>`;
             const beneficiariesSummaryHtml =
               plannedBeneficiariesForExport && totalBeneficiariesRecorded > 0
-                ? `<p style="margin:0 0 4px 0;font-size:11px;color:#374151;"><strong>Total bénéficiaires enregistrés :</strong> ${totalBeneficiariesRecorded.toLocaleString('fr-FR')} / ${plannedBeneficiariesForExport.toLocaleString('fr-FR')}$${
-                    beneficiariesProgressForExport !== null
-                      ? ` (${beneficiariesProgressForExport.toFixed(1)}%)`
-                      : ''
-                  }</p>`
+                ? `<p style="margin:0 0 4px 0;font-size:11px;color:#374151;"><strong>Total bénéficiaires enregistrés :</strong> ${totalBeneficiariesRecorded.toLocaleString('fr-FR')} / ${plannedBeneficiariesForExport.toLocaleString('fr-FR')}$${beneficiariesProgressForExport !== null
+                  ? ` (${beneficiariesProgressForExport.toFixed(1)}%)`
+                  : ''
+                }</p>`
                 : '';
             const listHtml =
               '<ol style="margin:0 0 0 16px;padding:0;font-size:11px;color:#374151;">' +
@@ -410,9 +409,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const filteredProjects = projects.filter((p) => {
     const lowerSearch = searchTerm.toLowerCase();
-    const text = `${p.projectName || ''} ${p.projectDescription || ''} ${p.bailleur || ''} ${
-      p.location || ''
-    }`.toLowerCase();
+    const text = `${p.projectName || ''} ${p.projectDescription || ''} ${p.bailleur || ''} ${p.location || ''
+      }`.toLowerCase();
     const matchesSearch = text.includes(lowerSearch);
     const matchesSector = selectedSector === 'Tous' || p.sector === selectedSector;
     const matchesType = selectedType === 'Tous' || p.type === selectedType;
@@ -434,7 +432,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             <div className="flex items-center space-x-4">
               <div className="hidden sm:flex items-center bg-white/10 p-2 rounded-lg backdrop-blur-sm">
                 <img
-                  src="/logo-sila.png"
+                  src="/public/logo-sila.png"
                   alt="Portail HUMANITAIRES SILA"
                   className="h-10 w-auto"
                   loading="lazy"
@@ -446,7 +444,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                   {infoMessage}
                 </div>
               )}
-              
+
               <div className="bg-white/10 p-2 rounded-lg backdrop-blur-sm">
                 <Building className="h-7 w-7 text-white" />
               </div>
@@ -462,7 +460,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-6">
               <div className="hidden md:block text-right">
                 <div className="text-sm font-bold text-white tracking-wide">{user.orgName}</div>
@@ -486,7 +484,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       <nav className="bg-[#002060] text-white shadow-lg sticky top-0 z-40 border-t border-blue-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-12 overflow-x-auto whitespace-nowrap no-scrollbar">
-             {/* Note: Colors hardcoded in original kept here but wrapped in cleaner layout */}
+            {/* Note: Colors hardcoded in original kept here but wrapped in cleaner layout */}
             <a
               href="#"
               onClick={(e) => e.preventDefault()}
@@ -540,7 +538,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       </nav>
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        
+
         {/* Page Header & Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-200 pb-6">
           <div>

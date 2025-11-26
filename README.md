@@ -1,72 +1,316 @@
+# 🌟 Portail HUMANITAIRES - SILA
+
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+
+![Portail SILA](https://img.shields.io/badge/Portail-SILA-blue?style=for-the-badge)
+![React](https://img.shields.io/badge/React-19.2.0-61DAFB?style=for-the-badge&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript)
+![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=node.js)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql)
+
+**نظام إدارة المشاريع الإنسانية لوزارة العمل الاجتماعي والشؤون الإنسانية - تشاد**
+
+[الوثائق](#-الوثائق) • [التثبيت](#-التثبيت-المحلي) • [النشر](#-النشر-على-vps) • [المساهمة](#-المساهمة)
+
 </div>
 
-# Portail HUMANITAIRES
+---
 
-This contains everything you need to run your app locally.
+## 📋 نظرة عامة
 
-View your app in AI Studio: https://ai.studio/apps/drive/1-l3D2_PgxyTOAklvtT87iW4VgA3VT8GS
+**Portail HUMANITAIRES** هو تطبيق ويب شامل لإدارة المشاريع والأنشطة الإنسانية في محافظة سيلا، تشاد. يوفر النظام:
 
-## Run Locally
+- ✅ **إدارة المنظمات** - تسجيل وإدارة المنظمات الإنسانية
+- ✅ **إدارة المشاريع** - تتبع المشاريع والأنشطة
+- ✅ **لوحات تحكم تفاعلية** - للمسؤولين والمنظمات ومديري المشاريع
+- ✅ **إحصائيات وتقارير** - بيانات شاملة عن الأنشطة الإنسانية
+- ✅ **نظام مصادقة متعدد المستويات** - أمان محكم
+- ✅ **تصدير PDF** - تقارير احترافية
 
-**Prerequisites:**  Node.js
+---
 
-### Backend (API)
-1. `cd backend`
-2. `npm install`
-3. Configure `.env` (example):
-   - `PORT=5000`
-   - `ALLOWED_ORIGINS=http://localhost:5173`
-   - `SMTP_HOST=your-smtp-host`
-   - `SMTP_PORT=587`
-   - `SMTP_USER=your-smtp-username`
-   - `SMTP_PASS=your-smtp-password`
-   - `SMTP_SECURE=false` (true if you use 465)
-   - `SMTP_FROM="Portail HUMANITAIRES <no-reply@domain>"` (adresse émettrice)
-   - `DB_HOST=your-db-host` (Hostinger MySQL)
-   - `DB_PORT=3306`
-   - `DB_USER=your-db-user`
-   - `DB_PASS=your-db-password`
-   - `DB_NAME=your-db-name`
-   - `DB_CONNECTION_LIMIT=10`
-4. Run the API in watch mode: `npm run dev` (or `npm run build && npm start` for production)
+## 🏗️ البنية التقنية
 
-### Frontend (Vite/React)
-1. Install dependencies: `npm install`
-2. Set the `GEMINI_API_KEY` and `VITE_API_BASE_URL` (e.g. `http://localhost:5000`) in [.env.local](.env.local)
-3. Run the app: `npm run dev`
+### Frontend
+- **React 19.2** - مكتبة واجهة المستخدم
+- **TypeScript** - للكتابة الآمنة
+- **Vite** - أداة بناء سريعة
+- **Lucide React** - أيقونات عصرية
 
-### Base de Donnees (MySQL Hostinger)
-- Le backend utilise MySQL via `mysql2` (plus de fichiers JSON).
-- Les tables sont creees automatiquement au demarrage si absentes : `orgs` et `projects`.
-- Script SQL equivalent si besoin de creation manuelle :
-  ```sql
-  CREATE TABLE orgs (
-    org_id VARCHAR(64) PRIMARY KEY,
-    org_name VARCHAR(255) NOT NULL,
-    org_name_full VARCHAR(255) NOT NULL,
-    org_type VARCHAR(128) NOT NULL,
-    contact_name VARCHAR(255),
-    contact_email VARCHAR(255) NOT NULL,
-    contact_phone VARCHAR(64),
-    created_at BIGINT NOT NULL
-  );
+### Backend
+- **Node.js + Express** - خادم API
+- **TypeScript** - للكتابة الآمنة
+- **MySQL** - قاعدة البيانات
+- **JWT** - المصادقة
+- **Bcrypt** - تشفير كلمات المرور
+- **Nodemailer** - إرسال البريد الإلكتروني
 
-  CREATE TABLE projects (
-    id VARCHAR(64) PRIMARY KEY,
-    org_id VARCHAR(64) NOT NULL,
-    bailleur VARCHAR(255) NOT NULL,
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    type VARCHAR(64) NOT NULL,
-    sector VARCHAR(128) NOT NULL,
-    location TEXT NOT NULL,
-    created_at BIGINT NOT NULL,
-    CONSTRAINT fk_projects_org FOREIGN KEY (org_id) REFERENCES orgs(org_id) ON DELETE CASCADE
-  );
-  ```
+### Infrastructure
+- **PM2** - إدارة العمليات
+- **Nginx** - Reverse Proxy
+- **Let's Encrypt** - SSL/TLS
 
-### Accès
-- Les organisations demandent un identifiant via le formulaire « Demande d’Identifiant Unique » (endpoint `/api/register`). L’ID est envoyé par email via SMTP.
-- Connexion ensuite avec le nom d’organisation + l’ID reçu par email (endpoint `/api/login`).
+---
+
+## 📚 الوثائق
+
+| الملف | الوصف |
+|------|-------|
+| [QUICK_START.md](QUICK_START.md) | 🚀 دليل البدء السريع - ابدأ من هنا! |
+| [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) | 📖 دليل النشر الشامل على VPS |
+| [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | 🏗️ بنية المشروع والتطبيقات المثبتة |
+
+---
+
+## 💻 التثبيت المحلي
+
+### المتطلبات
+- Node.js 18+ أو 20+ (LTS)
+- MySQL 8.0+
+- npm أو yarn
+
+### 1. استنساخ المشروع
+
+```bash
+git clone https://github.com/your-username/portail-sila.git
+cd portail-sila
+```
+
+### 2. إعداد Backend
+
+```bash
+cd backend
+
+# تثبيت Dependencies
+npm install
+
+# نسخ ملف البيئة
+cp .env.example .env
+
+# تعديل .env بمعلومات قاعدة البيانات الخاصة بك
+nano .env
+
+# بناء Backend
+npm run build
+
+# تشغيل في وضع التطوير
+npm run dev
+```
+
+### 3. إعداد Frontend
+
+```bash
+# العودة إلى المجلد الرئيسي
+cd ..
+
+# تثبيت Dependencies
+npm install
+
+# نسخ ملف البيئة
+cp .env.example .env.local
+
+# تعديل .env.local
+nano .env.local
+
+# تشغيل في وضع التطوير
+npm run dev
+```
+
+### 4. الوصول إلى التطبيق
+
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:5000
+
+### 5. تسجيل الدخول كمسؤول
+
+- **اسم المستخدم:** `DPASSAHS`
+- **كلمة المرور:** `DPASSAHS@2025`
+
+---
+
+## 🚀 النشر على VPS
+
+### الطريقة السريعة
+
+```bash
+# 1. على VPS - تشغيل سكريبت الإعداد
+wget https://raw.githubusercontent.com/your-username/portail-sila/main/setup-vps.sh
+chmod +x setup-vps.sh
+./setup-vps.sh
+
+# 2. استنساخ المشروع
+cd /var/www
+git clone https://github.com/your-username/portail-sila.git
+cd portail-sila
+
+# 3. إعداد Backend
+cd backend
+nano .env  # أضف متغيرات البيئة
+npm install
+npm run build
+pm2 start ecosystem.config.js
+
+# 4. إعداد Frontend
+cd ..
+nano .env.local  # أضف متغيرات البيئة
+npm install
+npm run build
+
+# 5. إعداد Nginx
+sudo cp nginx.conf /etc/nginx/sites-available/tchadcare.com
+sudo ln -s /etc/nginx/sites-available/tchadcare.com /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+
+# 6. تثبيت SSL
+sudo certbot --nginx -d tchadcare.com -d www.tchadcare.com
+```
+
+**📖 للتفاصيل الكاملة:** راجع [QUICK_START.md](QUICK_START.md)
+
+---
+
+## 🔄 تحديث التطبيق
+
+```bash
+# على VPS
+cd /var/www/portail-sila
+./deploy.sh
+```
+
+---
+
+## 🗄️ قاعدة البيانات
+
+### الجداول الرئيسية
+
+- `orgs` - المنظمات
+- `projects` - المشاريع
+- `project_activities` - أنشطة المشاريع
+- `admins` - المسؤولين
+- `delegation_events` - فعاليات الوفد
+- `province_stats` - إحصائيات المحافظة
+- `province_structural_stats` - الإحصائيات الهيكلية
+- `project_update_requests` - طلبات تحديث المشاريع
+
+**ملاحظة:** يتم إنشاء الجداول تلقائياً عند أول تشغيل للـ Backend.
+
+---
+
+## 🔐 الأمان
+
+- ✅ تشفير كلمات المرور باستخدام Bcrypt
+- ✅ JWT للمصادقة
+- ✅ HTTPS/SSL إلزامي في الإنتاج
+- ✅ حماية من CORS
+- ✅ التحقق من المدخلات
+- ✅ Headers أمان في Nginx
+
+---
+
+## 👥 الأدوار
+
+| الدور | الصلاحيات |
+|------|-----------|
+| **Admin** | إدارة كاملة للنظام |
+| **Organization** | إدارة المشاريع والأنشطة الخاصة |
+| **Project Manager** | إدارة نشاط مشروع محدد |
+
+---
+
+## 📊 الميزات
+
+### للمسؤولين
+- عرض جميع المشاريع والأنشطة
+- إدارة المنظمات (تفعيل/تعطيل)
+- إحصائيات شاملة
+- تصدير التقارير PDF
+- إدارة طلبات التحديث
+
+### للمنظمات
+- إضافة وتعديل المشاريع
+- إدارة الأنشطة
+- عرض الإحصائيات الخاصة
+- طلب تحديثات على المشاريع
+
+### لمديري المشاريع
+- إدارة أنشطة مشروع محدد
+- رفع الصور
+- تحديث حالة الأنشطة
+
+---
+
+## 🛠️ Scripts مفيدة
+
+### Backend
+```bash
+npm run dev      # تشغيل في وضع التطوير
+npm run build    # بناء للإنتاج
+npm start        # تشغيل الإنتاج
+```
+
+### Frontend
+```bash
+npm run dev      # تشغيل Vite Dev Server
+npm run build    # بناء للإنتاج
+npm run preview  # معاينة البناء
+```
+
+---
+
+## 🐛 استكشاف الأخطاء
+
+### خطأ الاتصال بقاعدة البيانات
+```bash
+# تحقق من Remote MySQL في Hostinger
+# أضف IP الخاص بك في: Remote MySQL Settings
+```
+
+### خطأ 502 Bad Gateway
+```bash
+pm2 status
+pm2 logs portail-backend
+sudo systemctl restart nginx
+```
+
+### المنفذ مستخدم
+```bash
+# Windows
+netstat -ano | findstr :5000
+taskkill /PID <process_id> /F
+
+# Linux
+lsof -ti:5000 | xargs kill -9
+```
+
+---
+
+## 📞 الدعم
+
+للمساعدة أو الإبلاغ عن مشاكل:
+- 📧 البريد الإلكتروني: support@tchadcare.com
+- 🌐 الموقع: https://tchadcare.com
+
+---
+
+## 📄 الترخيص
+
+هذا المشروع ملك لوزارة العمل الاجتماعي والشؤون الإنسانية - محافظة سيلا، تشاد.
+
+---
+
+## 🙏 شكر وتقدير
+
+تم تطويره بدعم من:
+- وزارة العمل الاجتماعي والشؤون الإنسانية
+- محافظة سيلا - تشاد
+
+---
+
+<div align="center">
+
+**صُنع بـ ❤️ لخدمة الإنسانية**
+
+![Chad Flag](https://img.shields.io/badge/Chad-Flag-blue?style=for-the-badge)
+
+</div>
