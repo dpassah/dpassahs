@@ -76,7 +76,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, adminHeade
           {/* Logo & Text Left */}
           <div className="flex items-center gap-3">
             <img
-              src="/public/logo-sila.png"
+              src="/logo-sila.png"
               alt="Logo Sila"
               className="h-16 w-16 object-contain"
             />

@@ -432,7 +432,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             <div className="flex items-center space-x-4">
               <div className="hidden sm:flex items-center bg-white/10 p-2 rounded-lg backdrop-blur-sm">
                 <img
-                  src="/public/logo-sila.png"
+                  src="/logo-sila.png"
                   alt="Portail HUMANITAIRES SILA"
                   className="h-10 w-auto"
                   loading="lazy"
