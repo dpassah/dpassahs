@@ -6,6 +6,7 @@ import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import {
   initDB,
   getOrgById,
@@ -104,10 +105,15 @@ app.options('*', cors());
 // File upload configuration for delegation event images
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // Save to the main project's public directory, not the backend's
-    const basePath = process.cwd();
-    const projectRoot = basePath.includes('\\backend\\') ? basePath.replace('\\backend', '') : basePath.replace('/backend', '');
-    cb(null, path.join(projectRoot, 'public', 'delegation-events'));
+    // Save to the backend's public directory
+    const uploadPath = path.join(__dirname, '../public/delegation-events');
+
+    // Ensure directory exists
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+
+    cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -605,7 +611,7 @@ app.post('/api/admin/delegation-events/upload', upload.single('image'), async (r
 
     // Return the public URL of the uploaded file
     const imageUrl = `/public/delegation-events/${req.file.filename}`;
-    
+
     return res.json({ url: imageUrl });
   } catch (err) {
     console.error('Image upload error', err);
