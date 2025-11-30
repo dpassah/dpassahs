@@ -131,8 +131,10 @@ const upload = multer({
   }
 });
 
-// Serve static files from public directory (support both /public for local and /api/public for prod proxy)
-const publicPath = path.join(process.cwd().includes('\\backend\\') ? process.cwd().replace('\\backend', '') : process.cwd().replace('/backend', ''), 'public');
+// Serve static files from public directory
+// Images are stored in backend/public. 
+// We use __dirname to correctly locate the folder relative to the script (src/ or dist/), ensuring it works regardless of CWD.
+const publicPath = path.join(__dirname, '../public');
 app.use(['/public', '/api/public'], express.static(publicPath));
 
 app.use(express.json());
