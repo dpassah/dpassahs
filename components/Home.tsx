@@ -300,7 +300,7 @@ export const Home: React.FC = () => {
   const getFullImageUrl = (image: string | null | undefined) => {
     if (!image) return '';
     if (image.startsWith('http')) return image;
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000');
     
     // Clean up double slashes if needed
     if (image.startsWith('/')) {

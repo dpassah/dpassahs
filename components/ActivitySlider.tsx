@@ -56,7 +56,7 @@ const ActivitySlider: React.FC<ActivitySliderProps> = ({ activities, onActivityC
         return image;
       }
 
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000');
 
       if (image.startsWith('/public/')) {
         return `${API_BASE_URL}${image}`;
@@ -72,7 +72,7 @@ const ActivitySlider: React.FC<ActivitySliderProps> = ({ activities, onActivityC
   const getFullImageUrl = (image: string) => {
     if (!image) return '';
     if (image.startsWith('http')) return image;
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000');
     if (image.startsWith('/public/')) return `${API_BASE_URL}${image}`;
     return `${API_BASE_URL}/public/delegation-events/${image}`;
   };
