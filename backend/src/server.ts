@@ -131,8 +131,9 @@ const upload = multer({
   }
 });
 
-// Serve static files from public directory
-app.use('/public', express.static(path.join(process.cwd().includes('\\backend\\') ? process.cwd().replace('\\backend', '') : process.cwd().replace('/backend', ''), 'public')));
+// Serve static files from public directory (support both /public for local and /api/public for prod proxy)
+const publicPath = path.join(process.cwd().includes('\\backend\\') ? process.cwd().replace('\\backend', '') : process.cwd().replace('/backend', ''), 'public');
+app.use(['/public', '/api/public'], express.static(publicPath));
 
 app.use(express.json());
 
