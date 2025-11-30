@@ -9,7 +9,8 @@ import {
   ProjectActivity,
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+// Export API_BASE_URL for use in other components
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000');
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
