@@ -79,6 +79,7 @@ export interface DelegationEvent {
   date?: string | null;
   location?: string | null;
   description?: string | null;
+  images?: string[] | null;
   createdAt: number;
 }
 
@@ -87,10 +88,12 @@ export interface RecentActivity {
   title: string;
   date?: string | null;
   location?: string | null;
+  description?: string | null;
   orgId: string;
   orgName: string;
   projectId: string;
   projectName?: string | null;
+  govServices?: string | null;
   status?: string | null;
 }
 
@@ -98,7 +101,30 @@ export const adminListDelegationEvents = async (): Promise<DelegationEvent[]> =>
   const result = await request<{ events: DelegationEvent[] }>('/api/admin/delegation-events', {
     method: 'GET',
   });
-  return result.events || [];
+  
+  // Parse images field if it's stored as JSON string
+  const events = (result.events || []).map(event => {
+    let parsedImages = null;
+    if (event.images) {
+      if (typeof event.images === 'string') {
+        try {
+          parsedImages = JSON.parse(event.images);
+        } catch (e) {
+          console.error('Failed to parse images JSON:', e);
+          parsedImages = [event.images]; // Fallback: treat as single image path
+        }
+      } else {
+        parsedImages = event.images;
+      }
+    }
+    
+    return {
+      ...event,
+      images: parsedImages
+    };
+  });
+  
+  return events;
 };
 
 export const adminCreateDelegationEvent = async (payload: {
@@ -106,12 +132,31 @@ export const adminCreateDelegationEvent = async (payload: {
   date?: string | null;
   location?: string | null;
   description?: string | null;
+  images?: string[] | null;
 }): Promise<DelegationEvent> => {
   const result = await request<{ event: DelegationEvent }>('/api/admin/delegation-events', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
   return result.event;
+};
+
+export const uploadDelegationEventImage = async (file: File): Promise<{ url: string }> => {
+  const formData = new FormData();
+  formData.append('image', file);
+  
+  const response = await fetch(`${API_BASE_URL}/api/admin/delegation-events/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Upload failed:', response.status, errorText);
+    throw new Error(`Failed to upload image (${response.status}): ${errorText}`);
+  }
+  
+  return response.json();
 };
 
 export const listRecentActivities = async (limit = 6): Promise<RecentActivity[]> => {
@@ -431,7 +476,70 @@ export const adminGetProvinceStructuralStats = async (): Promise<ProvinceStructu
   };
 };
 
-// --- Public contact ---
+// --- Sites & site monthly stats (admin) ---
+
+export type SiteKind = 'refugees' | 'returnees' | 'host_village';
+
+export interface Site {
+  id: string;
+  name: string;
+  kind: SiteKind;
+}
+
+export interface SiteMonthlyStat {
+  id?: string;
+  siteId: string;
+  month: string;
+  year: number;
+
+  // Réfugiés (Refugees)
+  ref_old_ind: number; // Individus (Anciens)
+  ref_old_hh: number;  // Ménages (Anciens)
+  ref_new_ind: number; // Individus (Nouveaux)
+  ref_new_hh: number;  // Ménages (Nouveaux)
+
+  // Retournés (Returnees)
+  ret_old_ind: number; // Individus (Anciens)
+  ret_old_hh: number;  // Ménages (Anciens)
+  ret_new_ind: number; // Individus (Nouveaux)
+  ret_new_hh: number;  // Ménages (Nouveaux)
+}
+
+export const adminListSites = async (): Promise<Site[]> => {
+  const result = await request<{ sites: Site[] }>('/api/admin/sites', {
+    method: 'GET',
+  });
+  return result.sites || [];
+};
+
+export const adminListSiteMonthlyStats = async (
+  month: string,
+  year: number,
+): Promise<SiteMonthlyStat[]> => {
+  const params = new URLSearchParams({ month, year: String(year) });
+  const result = await request<{ stats: SiteMonthlyStat[] }>(
+    `/api/admin/site-stats?${params.toString()}`,
+  );
+  return result.stats || [];
+};
+
+export const adminSaveSiteMonthlyStats = async (payload: {
+  month: string;
+  year: number;
+  items: Array<{
+    siteId: string;
+    ref_total_ind: number;
+    ref_total_hh: number;
+    ret_total_ind: number;
+    ret_total_hh: number;
+  }>;
+}): Promise<SiteMonthlyStat[]> => {
+  const result = await request<{ stats: SiteMonthlyStat[] }>('/api/admin/stats/save', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return result.stats || [];
+};
 
 export const sendContactMessage = async (name: string, email: string, message: string): Promise<void> => {
   await request<{ success: boolean }>('/api/contact', {

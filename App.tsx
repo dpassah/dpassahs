@@ -75,13 +75,57 @@ const App: React.FC = () => {
     sessionStorage.removeItem('sila_project_session');
     setUser(null);
     setProjectManager(null);
+    window.location.hash = '';
+    window.location.href = '/';
   };
 
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
-  const hash = typeof window !== 'undefined' ? window.location.hash : '';
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [currentHash, setCurrentHash] = useState(window.location.hash);
+
+  useEffect(() => {
+    const onLocationChange = () => {
+      setCurrentPath(window.location.pathname);
+      setCurrentHash(window.location.hash);
+    };
+    window.addEventListener('popstate', onLocationChange);
+    window.addEventListener('hashchange', onLocationChange);
+    return () => {
+      window.removeEventListener('popstate', onLocationChange);
+      window.removeEventListener('hashchange', onLocationChange);
+    };
+  }, []);
+
+  const pathname = currentPath;
+  const hash = currentHash;
 
   const isAdminLoginRoute = pathname === '/admin';
-  const isAdminPanelRoute = pathname === '/admin/panel';
+
+  // Admin panel routing with subsections under /admin/panel
+  const isAdminPanelBaseRoute = pathname === '/admin/panel' || pathname.startsWith('/admin/panel/');
+
+  type AdminSection = 'accounts' | 'orgs' | 'projects' | 'events' | 'delegationEvents';
+
+  const getAdminSectionFromPath = (path: string): AdminSection => {
+    if (!path.startsWith('/admin/panel')) return 'accounts';
+    const parts = path.split('/').filter(Boolean); // ["admin", "panel", maybe slug]
+    const slug = parts[2] || '';
+    switch (slug) {
+      case 'comptes':
+        return 'accounts';
+      case 'statistiques':
+        return 'orgs';
+      case 'projets':
+        return 'projects';
+      case 'activites-projets':
+        return 'events';
+      case 'activites-delegation':
+        return 'delegationEvents';
+      default:
+        return 'accounts';
+    }
+  };
+
+  const adminInitialSection = getAdminSectionFromPath(pathname);
   const isPmLoginRoute = pathname === '/projet';
   const isPmPanelRoute = pathname === '/projet/panel';
   const isHomeRoute = pathname === '/';
@@ -109,10 +153,10 @@ const App: React.FC = () => {
     );
   }
 
-  if (isAdminPanelRoute) {
+  if (isAdminPanelBaseRoute) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <AdminPanel />
+        <AdminPanel initialSection={adminInitialSection} />
       </div>
     );
   }

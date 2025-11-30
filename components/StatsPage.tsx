@@ -3,8 +3,12 @@ import { PublicLayout } from './PublicLayout';
 import {
   adminGetProvinceStructuralStats,
   adminListProvinceMonthlyStats,
+  adminListSiteMonthlyStats,
+  adminListSites,
   ProvinceStructuralStats,
   ProvinceMonthlyStat,
+  SiteMonthlyStat,
+  Site,
 } from '../services/api';
 
 const AnimatedNumber: React.FC<{ value: number; className?: string }> = ({ value, className }) => {
@@ -37,20 +41,36 @@ const AnimatedNumber: React.FC<{ value: number; className?: string }> = ({ value
 export const StatsPage: React.FC = () => {
   const [provinceStructStats, setProvinceStructStats] = useState<ProvinceStructuralStats | null>(null);
   const [provinceMonthlyStats, setProvinceMonthlyStats] = useState<ProvinceMonthlyStat[]>([]);
+  const [siteStats, setSiteStats] = useState<SiteMonthlyStat[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [detailView, setDetailView] = useState<'refugees' | 'returnees' | null>(null);
 
   useEffect(() => {
     const loadStats = async () => {
       try {
         setStatsLoading(true);
         setStatsError(null);
-        const [structStats, monthlyStats] = await Promise.all([
+
+        // Fetch structural stats, monthly stats and sites
+        const [structStats, monthlyStats, sitesList] = await Promise.all([
           adminGetProvinceStructuralStats(),
           adminListProvinceMonthlyStats(),
+          adminListSites(),
         ]);
+
         setProvinceStructStats(structStats);
         setProvinceMonthlyStats(monthlyStats || []);
+        setSites(sitesList || []);
+
+        // If we have monthly stats, fetch the site stats for the latest month
+        if (monthlyStats && monthlyStats.length > 0) {
+          const latest = monthlyStats[0];
+          const sites = await adminListSiteMonthlyStats(latest.month, latest.year);
+          setSiteStats(sites || []);
+        }
+
       } catch (err) {
         console.error('Erreur chargement stats Province Sila', err);
         const msg =
@@ -65,6 +85,14 @@ export const StatsPage: React.FC = () => {
   }, []);
 
   const latestMonthly = provinceMonthlyStats.length > 0 ? provinceMonthlyStats[0] : null;
+
+  // Calculate totals from site stats if available, otherwise fallback to province stats
+  const calculatedRefugeesTotal = siteStats.reduce((acc, s) => acc + (s.ref_total_ind || 0), 0);
+  const calculatedReturneesTotal = siteStats.reduce((acc, s) => acc + (s.ret_total_ind || 0), 0);
+
+  // If site stats are empty (e.g. no data entered for sites yet), fallback to the manual province stats if they exist
+  const displayRefugeesTotal = siteStats.length > 0 ? calculatedRefugeesTotal : (latestMonthly?.totalRefugees || 0);
+  const displayReturneesTotal = siteStats.length > 0 ? calculatedReturneesTotal : (latestMonthly?.totalReturnees || 0);
 
   const monthNames: Record<string, string> = {
     '01': 'Janvier',
@@ -83,8 +111,6 @@ export const StatsPage: React.FC = () => {
 
   const latestLabelMonth = latestMonthly ? monthNames[latestMonthly.month] || latestMonthly.month : '';
 
-  // --- التعديل هنا: استخدام أبعاد ثابتة (w-36 h-36) بدلاً من الاعتماد على aspect-square فقط ---
-  // هذا يضمن ظهور الدائرة حتى لو كانت الحاوية فارغة
   const cardBaseClass = `
     group relative flex flex-col justify-center items-center 
     w-36 h-36 sm:w-44 sm:h-44 md:w-48 md:h-48 lg:w-52 lg:h-52 
@@ -93,20 +119,17 @@ export const StatsPage: React.FC = () => {
     shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:shadow-[0_15px_35px_rgb(0,0,0,0.15)]
     transition-all duration-500 ease-out 
     transform hover:-translate-y-2 hover:scale-105 
-    overflow-hidden cursor-default mx-auto
+    overflow-hidden cursor-pointer mx-auto
   `;
 
-  // المحتوى الداخلي
   const cardContentClass = "flex flex-col justify-center items-center text-center p-2 z-10 w-full";
-
-  // العناوين: حجم خط متجاوب
   const titleClass = "text-[10px] sm:text-xs font-black text-gray-400 uppercase tracking-widest leading-tight mb-1 sm:mb-2 group-hover:text-gray-600 transition-colors duration-300 px-2";
-
-  // الأرقام: حجم خط كبير ومتجاوب
   const valueBaseClass = "text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tighter drop-shadow-sm";
-
-  // شريط اللون (تأثير الخلفية)
   const colorBarClass = "absolute top-0 left-0 right-0 h-3 opacity-60 z-0 transition-all duration-700 group-hover:h-full group-hover:opacity-10";
+
+  const handleToggleDetailView = (view: 'refugees' | 'returnees') => {
+    setDetailView(detailView === view ? null : view);
+  };
 
   return (
     <PublicLayout>
@@ -146,7 +169,7 @@ export const StatsPage: React.FC = () => {
                   </h2>
                   <span className="h-px w-8 sm:w-16 bg-gray-300"></span>
                 </div>
-                
+
                 {/* Grid layout adjusted */}
                 <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
                   {/* Card 1: Population */}
@@ -253,55 +276,169 @@ export const StatsPage: React.FC = () => {
                     <p className="text-gray-400 italic">Aucune donnée mensuelle disponible pour le moment.</p>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
-                    {/* Monthly Card 1: Total Refugees */}
-                    <div className={cardBaseClass}>
-                      <div className={`${colorBarClass} bg-[#FECB00]`} />
-                      <div className={cardContentClass}>
-                        <p className={titleClass}>Total Réfugiés</p>
-                        <AnimatedNumber
-                          value={latestMonthly.totalRefugees}
-                          className={`${valueBaseClass} text-[#002060]`}
-                        />
+                  <>
+                    <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
+                      {/* Monthly Card 1: Total Refugees */}
+                      <div
+                        className={cardBaseClass}
+                        onClick={() => handleToggleDetailView('refugees')}
+                      >
+                        <div className={`${colorBarClass} bg-[#FECB00]`} />
+                        <div className={cardContentClass}>
+                          <p className={titleClass}>Total Réfugiés</p>
+                          <AnimatedNumber
+                            value={displayRefugeesTotal}
+                            className={`${valueBaseClass} text-[#002060]`}
+                          />
+                          {detailView === 'refugees' && (
+                            <span className="mt-1 text-[9px] font-semibold text-[#002060] uppercase tracking-wide">
+                              Voir les camps
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Monthly Card 2: New Refugees */}
+                      <div className={cardBaseClass}>
+                        <div className={`${colorBarClass} bg-emerald-500`} />
+                        <div className={cardContentClass}>
+                          <p className={titleClass}>Nouveaux Réfugiés</p>
+                          <AnimatedNumber
+                            value={latestMonthly.newRefugees}
+                            className={`${valueBaseClass} text-emerald-600`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Monthly Card 3: Total Returnees */}
+                      <div
+                        className={cardBaseClass}
+                        onClick={() => handleToggleDetailView('returnees')}
+                      >
+                        <div className={`${colorBarClass} bg-[#002060]`} />
+                        <div className={cardContentClass}>
+                          <p className={titleClass}>Total Retournés</p>
+                          <AnimatedNumber
+                            value={displayReturneesTotal}
+                            className={`${valueBaseClass} text-[#002060]`}
+                          />
+                          {detailView === 'returnees' && (
+                            <span className="mt-1 text-[9px] font-semibold text-[#002060] uppercase tracking-wide">
+                              Voir les sites
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Monthly Card 4: New Returnees */}
+                      <div className={cardBaseClass}>
+                        <div className={`${colorBarClass} bg-emerald-500`} />
+                        <div className={cardContentClass}>
+                          <p className={titleClass}>Nouveaux Retournés</p>
+                          <AnimatedNumber
+                            value={latestMonthly.newReturnees}
+                            className={`${valueBaseClass} text-emerald-600`}
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    {/* Monthly Card 2: New Refugees */}
-                    <div className={cardBaseClass}>
-                      <div className={`${colorBarClass} bg-emerald-500`} />
-                      <div className={cardContentClass}>
-                        <p className={titleClass}>Nouveaux Réfugiés</p>
-                        <AnimatedNumber
-                          value={latestMonthly.newRefugees}
-                          className={`${valueBaseClass} text-emerald-600`}
-                        />
-                      </div>
-                    </div>
+                    {/* Detailed per-site breakdown when a total card is active */}
+                    {detailView && siteStats.length > 0 && (
+                      <div className="mt-10 bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <h3 className="text-xs sm:text-sm font-extrabold text-[#002060] uppercase tracking-widest">
+                              {detailView === 'refugees'
+                                ? 'Camps des Réfugiés - Détail par site'
+                                : 'Sites des Retournés - Détail par site'}
+                            </h3>
+                            <p className="text-[11px] text-gray-500 mt-1">
+                              Cliquez à nouveau sur la carte pour masquer ce détail.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDetailView(null)}
+                            className="text-[11px] px-3 py-1 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50"
+                          >
+                            Fermer
+                          </button>
+                        </div>
 
-                    {/* Monthly Card 3: Total Returnees */}
-                    <div className={cardBaseClass}>
-                      <div className={`${colorBarClass} bg-[#002060]`} />
-                      <div className={cardContentClass}>
-                        <p className={titleClass}>Total Retournés</p>
-                        <AnimatedNumber
-                          value={latestMonthly.totalReturnees}
-                          className={`${valueBaseClass} text-[#002060]`}
-                        />
-                      </div>
-                    </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {sites
+                            .filter((s) =>
+                              detailView === 'refugees' ? s.kind === 'refugees' : s.kind === 'returnees',
+                            )
+                            .map((s) => {
+                              const stat = siteStats.find((st) => st.siteId === s.id);
+                              const totalInd = detailView === 'refugees'
+                                ? stat?.ref_total_ind || 0
+                                : stat?.ret_total_ind || 0;
+                              const totalHh = detailView === 'refugees'
+                                ? stat?.ref_total_hh || 0
+                                : stat?.ret_total_hh || 0;
 
-                    {/* Monthly Card 4: New Returnees */}
-                    <div className={cardBaseClass}>
-                      <div className={`${colorBarClass} bg-emerald-500`} />
-                      <div className={cardContentClass}>
-                        <p className={titleClass}>Nouveaux Retournés</p>
-                        <AnimatedNumber
-                          value={latestMonthly.newReturnees}
-                          className={`${valueBaseClass} text-emerald-600`}
-                        />
+                              return (
+                                <div
+                                  key={s.id}
+                                  className="rounded-xl border border-gray-100 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm flex flex-col gap-2"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className="text-[11px] font-bold text-gray-700 uppercase tracking-wide">
+                                        {s.name}
+                                      </p>
+                                      <p className="text-[10px] text-gray-400 mt-0.5">
+                                        {detailView === 'refugees' ? 'Camp de réfugiés' : 'Site de retournés'}
+                                      </p>
+                                    </div>
+                                    <span
+                                      className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${
+                                        detailView === 'refugees'
+                                          ? 'border-blue-200 text-blue-700 bg-blue-50'
+                                          : 'border-emerald-200 text-emerald-700 bg-emerald-50'
+                                      }`}
+                                    >
+                                      {latestLabelMonth} {latestMonthly.year}
+                                    </span>
+                                  </div>
+
+                                  <div className="mt-2 grid grid-cols-2 gap-3 text-[11px]">
+                                    <div className="flex flex-col px-2 py-1.5 rounded-lg bg-white border border-gray-100">
+                                      <span className="text-[10px] text-gray-500 uppercase mb-0.5">Individus</span>
+                                      <span
+                                        className={`font-mono text-sm font-extrabold ${
+                                          detailView === 'refugees'
+                                            ? 'text-blue-700'
+                                            : 'text-emerald-700'
+                                        }`}
+                                      >
+                                        {totalInd.toLocaleString()}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex flex-col px-2 py-1.5 rounded-lg bg-white border border-gray-100">
+                                      <span className="text-[10px] text-gray-500 uppercase mb-0.5">Ménages</span>
+                                      <span
+                                        className={`font-mono text-sm font-extrabold ${
+                                          detailView === 'refugees'
+                                            ? 'text-blue-700'
+                                            : 'text-emerald-700'
+                                        }`}
+                                      >
+                                        {totalHh.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    )}
+                  </>
                 )}
               </section>
             </>

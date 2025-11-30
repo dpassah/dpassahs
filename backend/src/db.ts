@@ -143,6 +143,77 @@ export const initDB = async () => {
         );
       `);
 
+      // Province monthly stats - for storing cumulative monthly totals
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS province_monthly_stats (
+          id VARCHAR(64) PRIMARY KEY,
+          month VARCHAR(2) NOT NULL,
+          year INT NOT NULL,
+          total_refugees INT NOT NULL,
+          new_refugees INT NOT NULL,
+          total_returnees INT NOT NULL,
+          new_returnees INT NOT NULL,
+          created_at BIGINT NOT NULL,
+          UNIQUE KEY unique_month_year (month, year)
+        );
+      `);
+
+      // Camps / sites and their monthly statistics
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS sites (
+          id VARCHAR(64) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          kind ENUM('refugees', 'returnees', 'host_village') NOT NULL
+        );
+      `);
+
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS site_monthly_stats (
+          id VARCHAR(64) PRIMARY KEY,
+          site_id VARCHAR(64) NOT NULL,
+          month VARCHAR(2) NOT NULL,
+          year INT NOT NULL,
+          ref_total_ind INT DEFAULT 0,
+          ref_total_hh INT DEFAULT 0,
+          ret_total_ind INT DEFAULT 0,
+          ret_total_hh INT DEFAULT 0,
+          ref_new_ind INT DEFAULT 0,
+          ref_new_hh INT DEFAULT 0,
+          ret_new_ind INT DEFAULT 0,
+          ret_new_hh INT DEFAULT 0,
+          created_at BIGINT NOT NULL,
+          CONSTRAINT fk_site_monthly_stats_site FOREIGN KEY (site_id) REFERENCES sites(id),
+          UNIQUE KEY unique_site_month_year (site_id, month, year)
+        );
+      `);
+
+      // Migration: Add columns if they don't exist (for existing deployments)
+      try {
+        await connection.query(`ALTER TABLE site_monthly_stats ADD COLUMN ref_total_ind INT DEFAULT 0`);
+      } catch (e) { }
+      try {
+        await connection.query(`ALTER TABLE site_monthly_stats ADD COLUMN ref_total_hh INT DEFAULT 0`);
+      } catch (e) { }
+      try {
+        await connection.query(`ALTER TABLE site_monthly_stats ADD COLUMN ret_total_ind INT DEFAULT 0`);
+      } catch (e) { }
+      try {
+        await connection.query(`ALTER TABLE site_monthly_stats ADD COLUMN ret_total_hh INT DEFAULT 0`);
+      } catch (e) { }
+      try {
+        await connection.query(`ALTER TABLE site_monthly_stats ADD COLUMN ref_new_ind INT DEFAULT 0`);
+      } catch (e) { }
+      try {
+        await connection.query(`ALTER TABLE site_monthly_stats ADD COLUMN ref_new_hh INT DEFAULT 0`);
+      } catch (e) { }
+      try {
+        await connection.query(`ALTER TABLE site_monthly_stats ADD COLUMN ret_new_ind INT DEFAULT 0`);
+      } catch (e) { }
+      try {
+        await connection.query(`ALTER TABLE site_monthly_stats ADD COLUMN ret_new_hh INT DEFAULT 0`);
+      } catch (e) { }
+
+
       // Ensure default admin
       const [admins] = await connection.query<RowDataPacket[]>('SELECT * FROM admins WHERE username = ?', ['DPASSAHS']);
       if (admins.length === 0) {
@@ -330,33 +401,71 @@ export interface DelegationEventRecord {
   date: string | null;
   location: string | null;
   description: string | null;
+  images: string | null;
   createdAt: number;
 }
 
 export const getDelegationEvents = async (): Promise<DelegationEventRecord[]> => {
   const pool = getPool();
-  const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT id, title, date, location, description, created_at AS createdAt
-     FROM delegation_events
-     ORDER BY date DESC, created_at DESC`,
-  );
-  return rows as DelegationEventRecord[];
+  try {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT id, title, date, location, description, images, created_at AS createdAt
+       FROM delegation_events
+       ORDER BY date DESC, created_at DESC`,
+    );
+    
+    return rows as DelegationEventRecord[];
+  } catch (err: any) {
+    // If images column doesn't exist, fall back to query without it
+    if (err.code === 'ER_BAD_FIELD_ERROR') {
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT id, title, date, location, description, created_at AS createdAt
+         FROM delegation_events
+         ORDER BY date DESC, created_at DESC`,
+      );
+      // Add null images to each record
+      return (rows as any[]).map(row => ({ ...row, images: null }));
+    }
+    throw err;
+  }
 };
 
 export const insertDelegationEvent = async (event: DelegationEventRecord): Promise<void> => {
   const pool = getPool();
-  await pool.execute(
-    `INSERT INTO delegation_events (id, title, date, location, description, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [
-      event.id,
-      event.title,
-      event.date || null,
-      event.location || null,
-      event.description || null,
-      event.createdAt,
-    ],
-  );
+  try {
+    // Try to insert with images column
+    await pool.execute(
+      `INSERT INTO delegation_events (id, title, date, location, description, images, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        event.id,
+        event.title,
+        event.date || null,
+        event.location || null,
+        event.description || null,
+        event.images ? JSON.stringify(event.images) : null,
+        event.createdAt,
+      ],
+    );
+  } catch (err: any) {
+    // If images column doesn't exist, fall back to insert without it
+    if (err.code === 'ER_BAD_FIELD_ERROR') {
+      await pool.execute(
+        `INSERT INTO delegation_events (id, title, date, location, description, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          event.id,
+          event.title,
+          event.date || null,
+          event.location || null,
+          event.description || null,
+          event.createdAt,
+        ],
+      );
+    } else {
+      throw err;
+    }
+  }
 };
 
 // --- Projects ---
@@ -787,8 +896,8 @@ export const insertProjectActivity = async (activity: ProjectActivity): Promise<
       activity.status || 'pending',
       activity.description || null,
       typeof activity.beneficiariesCount === 'number' &&
-      !Number.isNaN(activity.beneficiariesCount) &&
-      activity.beneficiariesCount >= 0
+        !Number.isNaN(activity.beneficiariesCount) &&
+        activity.beneficiariesCount >= 0
         ? activity.beneficiariesCount
         : 0,
       typeof activity.daysCount === 'number' && !Number.isNaN(activity.daysCount)
@@ -819,6 +928,7 @@ export interface RecentActivityRecord {
   title: string;
   date: string | null;
   location: string | null;
+  description: string | null;
   orgId: string;
   orgName: string;
   projectId: string;
@@ -835,6 +945,7 @@ export const getRecentActivities = async (limit: number): Promise<RecentActivity
        a.title,
        a.date,
        a.location,
+       a.description,
        a.status,
        a.gov_services AS govServices,
        a.org_id AS orgId,
@@ -885,20 +996,203 @@ export const insertProvinceMonthlyStat = async (stat: ProvinceMonthlyStatRecord)
 
 export const listProvinceMonthlyStats = async (): Promise<ProvinceMonthlyStatRecord[]> => {
   const pool = getPool();
+
+  // Aggregate site monthly stats grouped by month and year
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    `SELECT 
+       CONCAT('pms-', year, '-', month) AS id,
+       month,
+       year,
+       SUM(ref_total_ind) AS totalRefugees,
+       SUM(ref_new_ind) AS newRefugees,
+       SUM(ret_total_ind) AS totalReturnees,
+       SUM(ret_new_ind) AS newReturnees,
+       MAX(created_at) AS createdAt
+     FROM site_monthly_stats
+     GROUP BY month, year
+     ORDER BY year DESC, month DESC`,
+  );
+
+  return rows as ProvinceMonthlyStatRecord[];
+};
+
+// --- Sites & Site Monthly Stats ---
+
+export type SiteKind = 'refugees' | 'returnees' | 'host_village';
+
+export interface SiteRecord {
+  id: string;
+  name: string;
+  kind: SiteKind;
+}
+
+export interface SiteMonthlyStatRecord {
+  id: string;
+  siteId: string;
+  month: number; // 1 .. 12
+  year: number;
+
+  // Totaux actuels (saisis par l'admin)
+  ref_total_ind: number;
+  ref_total_hh: number;
+  ret_total_ind: number;
+  ret_total_hh: number;
+
+  // Augmentations mensuelles (calculées automatiquement)
+  ref_new_ind: number;
+  ref_new_hh: number;
+  ret_new_ind: number;
+  ret_new_hh: number;
+
+  createdAt: number;
+}
+
+export const listSites = async (): Promise<SiteRecord[]> => {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    `SELECT id, name, kind FROM sites ORDER BY name ASC`,
+  );
+  return rows as SiteRecord[];
+};
+
+export const insertSiteMonthlyStats = async (
+  stats: SiteMonthlyStatRecord[],
+): Promise<void> => {
+  if (!stats.length) return;
+  const pool = getPool();
+  const sql = `
+    INSERT INTO site_monthly_stats (
+      id,
+      site_id,
+      month,
+      year,
+      ref_total_ind,
+      ref_total_hh,
+      ret_total_ind,
+      ret_total_hh,
+      ref_new_ind,
+      ref_new_hh,
+      ret_new_ind,
+      ret_new_hh,
+      created_at
+    ) VALUES ?
+    ON DUPLICATE KEY UPDATE
+      ref_total_ind = VALUES(ref_total_ind),
+      ref_total_hh  = VALUES(ref_total_hh),
+      ret_total_ind = VALUES(ret_total_ind),
+      ret_total_hh  = VALUES(ret_total_hh),
+      ref_new_ind   = VALUES(ref_new_ind),
+      ref_new_hh    = VALUES(ref_new_hh),
+      ret_new_ind   = VALUES(ret_new_ind),
+      ret_new_hh    = VALUES(ret_new_hh),
+      created_at    = VALUES(created_at)
+  `;
+  const values = stats.map((s) => [
+    s.id,
+    s.siteId,
+    s.month,
+    s.year,
+    s.ref_total_ind,
+    s.ref_total_hh,
+    s.ret_total_ind,
+    s.ret_total_hh,
+    s.ref_new_ind,
+    s.ref_new_hh,
+    s.ret_new_ind,
+    s.ret_new_hh,
+    s.createdAt,
+  ]);
+  await (pool as any).query(sql, [values]);
+};
+
+export const getSiteMonthlyStatForMonthYear = async (
+  siteId: string,
+  month: number,
+  year: number,
+): Promise<SiteMonthlyStatRecord | null> => {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    `SELECT
+      id,
+      site_id AS siteId,
+      month,
+      year,
+      ref_total_ind,
+      ref_total_hh,
+      ret_total_ind,
+      ret_total_hh,
+      ref_new_ind,
+      ref_new_hh,
+      ret_new_ind,
+      ret_new_hh,
+      created_at AS createdAt
+     FROM site_monthly_stats
+     WHERE site_id = ? AND month = ? AND year = ?
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [siteId, month, year],
+  );
+  if (!rows.length) return null;
+  const row = rows[0] as any;
+  return {
+    id: row.id,
+    siteId: String(row.siteId),
+    month: Number(row.month) || 0,
+    year: Number(row.year) || 0,
+    ref_total_ind: Number(row.ref_total_ind) || 0,
+    ref_total_hh: Number(row.ref_total_hh) || 0,
+    ret_total_ind: Number(row.ret_total_ind) || 0,
+    ret_total_hh: Number(row.ret_total_hh) || 0,
+    ref_new_ind: Number(row.ref_new_ind) || 0,
+    ref_new_hh: Number(row.ref_new_hh) || 0,
+    ret_new_ind: Number(row.ret_new_ind) || 0,
+    ret_new_hh: Number(row.ret_new_hh) || 0,
+    createdAt: Number(row.createdAt) || Date.now(),
+  };
+};
+
+export const listSiteMonthlyStatsByMonthYear = async (
+  month: string,
+  year: number,
+): Promise<SiteMonthlyStatRecord[]> => {
+  const pool = getPool();
+  const monthNum = Number(month);
   const [rows] = await pool.execute<RowDataPacket[]>(
     `SELECT 
        id,
+       site_id AS siteId,
        month,
        year,
-       total_refugees AS totalRefugees,
-       new_refugees AS newRefugees,
-       total_returnees AS totalReturnees,
-       new_returnees AS newReturnees,
+       ref_total_ind,
+       ref_total_hh,
+       ret_total_ind,
+       ret_total_hh,
+       ref_new_ind,
+       ref_new_hh,
+       ret_new_ind,
+       ret_new_hh,
        created_at AS createdAt
-     FROM province_stats
-     ORDER BY year DESC, month DESC, created_at DESC`,
+     FROM site_monthly_stats
+     WHERE month = ? AND year = ?
+     ORDER BY created_at DESC`,
+    [monthNum, year],
   );
-  return rows as ProvinceMonthlyStatRecord[];
+
+  return (rows as any[]).map((row) => ({
+    id: row.id,
+    siteId: String(row.siteId),
+    month: Number(row.month) || 0,
+    year: Number(row.year) || 0,
+    ref_total_ind: Number(row.ref_total_ind) || 0,
+    ref_total_hh: Number(row.ref_total_hh) || 0,
+    ret_total_ind: Number(row.ret_total_ind) || 0,
+    ret_total_hh: Number(row.ret_total_hh) || 0,
+    ref_new_ind: Number(row.ref_new_ind) || 0,
+    ref_new_hh: Number(row.ref_new_hh) || 0,
+    ret_new_ind: Number(row.ret_new_ind) || 0,
+    ret_new_hh: Number(row.ret_new_hh) || 0,
+    createdAt: Number(row.createdAt) || Date.now(),
+  }));
 };
 
 // --- Province Structural Stats ---

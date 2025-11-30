@@ -4,6 +4,8 @@ import express, { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import path from 'path';
 import {
   initDB,
   getOrgById,
@@ -40,6 +42,11 @@ import {
   listProvinceMonthlyStats,
   getAdminProjectsPaged,
   getAdminActivitiesPaged,
+  listSites,
+  insertSiteMonthlyStats,
+  listSiteMonthlyStatsByMonthYear,
+  getSiteMonthlyStatForMonthYear,
+  SiteMonthlyStatRecord,
 } from './db';
 import {
   AdminLoginPayload,
@@ -93,6 +100,40 @@ app.use(
   }),
 );
 app.options('*', cors());
+
+// File upload configuration for delegation event images
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Save to the main project's public directory, not the backend's
+    const basePath = process.cwd();
+    const projectRoot = basePath.includes('\\backend\\') ? basePath.replace('\\backend', '') : basePath.replace('/backend', '');
+    cb(null, path.join(projectRoot, 'public', 'delegation-events'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `event-${uniqueSuffix}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
+// Serve static files from public directory
+app.use('/public', express.static(path.join(process.cwd().includes('\\backend\\') ? process.cwd().replace('\\backend', '') : process.cwd().replace('/backend', ''), 'public')));
+
 app.use(express.json());
 
 const normalizeType = (type: string | undefined | null): ProjectType | null => {
@@ -298,6 +339,122 @@ app.post('/api/admin/login', async (req: Request, res: Response) => {
   }
 });
 
+// --- Admin: Sites & Site Monthly Stats ---
+
+app.get('/api/admin/sites', async (_req: Request, res: Response) => {
+  try {
+    const sites = await listSites();
+    return res.json({ sites });
+  } catch (err) {
+    console.error('Admin list sites error', err);
+    return res
+      .status(500)
+      .json({ message: 'Erreur serveur lors de la récupération des sites.' });
+  }
+});
+
+app.get('/api/admin/site-stats', async (req: Request, res: Response) => {
+  try {
+    const monthRaw = (req.query.month as string | undefined) || '';
+    const yearRaw = (req.query.year as string | undefined) || '';
+    const m = monthRaw.trim();
+    const y = parseInt(yearRaw, 10);
+
+    if (!m || !/^\d{2}$/.test(m) || Number(m) < 1 || Number(m) > 12) {
+      return res.status(400).json({ message: 'Mois invalide. Utiliser un format 01-12.' });
+    }
+    if (!Number.isFinite(y) || y < 2000 || y > 2100) {
+      return res.status(400).json({ message: 'Annee invalide.' });
+    }
+
+    const stats = await listSiteMonthlyStatsByMonthYear(m, y);
+    return res.json({ stats });
+  } catch (err) {
+    console.error('Admin list site monthly stats error', err);
+    return res
+      .status(500)
+      .json({ message: 'Erreur serveur lors de la lecture des statistiques des sites.' });
+  }
+});
+
+app.post('/api/admin/stats/save', async (req: Request, res: Response) => {
+  try {
+    const { month, year, items } = req.body || {};
+
+    const mNum = Number(typeof month === 'string' ? month : String(month || ''));
+    const yNum = typeof year === 'number' ? year : Number(year);
+
+    if (!Number.isFinite(mNum) || mNum < 1 || mNum > 12) {
+      return res.status(400).json({ message: 'Mois invalide. Utiliser un format 01-12.' });
+    }
+    if (!Number.isFinite(yNum) || yNum < 2000 || yNum > 2100) {
+      return res.status(400).json({ message: 'Annee invalide.' });
+    }
+
+    const payload = Array.isArray(items) ? items : [];
+    const now = Date.now();
+
+    const prevMonth = mNum === 1 ? 12 : mNum - 1;
+    const prevYear = mNum === 1 ? yNum - 1 : yNum;
+
+    const siteRecords: SiteMonthlyStatRecord[] = await Promise.all(
+      payload
+        .filter((it: any) => it && it.siteId)
+        .map(async (it: any) => {
+          const siteId = String(it.siteId);
+
+          const cur_ref_total_ind = Number(it.ref_total_ind) || 0;
+          const cur_ref_total_hh = Number(it.ref_total_hh) || 0;
+          const cur_ret_total_ind = Number(it.ret_total_ind) || 0;
+          const cur_ret_total_hh = Number(it.ret_total_hh) || 0;
+
+          const prev = await getSiteMonthlyStatForMonthYear(siteId, prevMonth, prevYear);
+
+          const prev_ref_total_ind = prev?.ref_total_ind ?? 0;
+          const prev_ref_total_hh = prev?.ref_total_hh ?? 0;
+          const prev_ret_total_ind = prev?.ret_total_ind ?? 0;
+          const prev_ret_total_hh = prev?.ret_total_hh ?? 0;
+
+          // Calculate increases (Stock-Based Entry)
+          // New = Current - Previous. If Current < Previous, New = 0 (or should we allow negative? User said "Ensure the result is not negative")
+          const ref_new_ind = Math.max(0, cur_ref_total_ind - prev_ref_total_ind);
+          const ref_new_hh = Math.max(0, cur_ref_total_hh - prev_ref_total_hh);
+          const ret_new_ind = Math.max(0, cur_ret_total_ind - prev_ret_total_ind);
+          const ret_new_hh = Math.max(0, cur_ret_total_hh - prev_ret_total_hh);
+
+          return {
+            id: randomUUID(),
+            siteId,
+            month: mNum,
+            year: yNum,
+            ref_total_ind: cur_ref_total_ind,
+            ref_total_hh: cur_ref_total_hh,
+            ret_total_ind: cur_ret_total_ind,
+            ret_total_hh: cur_ret_total_hh,
+            ref_new_ind,
+            ref_new_hh,
+            ret_new_ind,
+            ret_new_hh,
+            createdAt: now,
+          };
+        }),
+    );
+
+    if (!siteRecords.length) {
+      return res.status(400).json({ message: 'Aucune donnée à enregistrer pour les sites.' });
+    }
+
+    await insertSiteMonthlyStats(siteRecords);
+
+    return res.status(201).json({ stats: siteRecords });
+  } catch (err) {
+    console.error('Admin save site stats error', err);
+    return res
+      .status(500)
+      .json({ message: "Erreur serveur lors de l'enregistrement des statistiques des sites." });
+  }
+});
+
 // Admin: paginated projects (for admin dashboard)
 app.get('/api/admin/projects', async (req: Request, res: Response) => {
   try {
@@ -437,6 +594,22 @@ app.get('/api/public/recent-activities', async (req: Request, res: Response) => 
   }
 });
 
+app.post('/api/admin/delegation-events/upload', upload.single('image'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image file provided' });
+    }
+
+    // Return the public URL of the uploaded file
+    const imageUrl = `/public/delegation-events/${req.file.filename}`;
+    
+    return res.json({ url: imageUrl });
+  } catch (err) {
+    console.error('Image upload error', err);
+    return res.status(500).json({ message: 'Error uploading image' });
+  }
+});
+
 app.get('/api/admin/delegation-events', async (_req: Request, res: Response) => {
   try {
     const events = await getDelegationEvents();
@@ -449,7 +622,7 @@ app.get('/api/admin/delegation-events', async (_req: Request, res: Response) => 
 
 app.post('/api/admin/delegation-events', async (req: Request, res: Response) => {
   try {
-    const { title, date, location, description } = req.body || {};
+    const { title, date, location, description, images } = req.body || {};
 
     if (!title || typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({ message: "Le titre de l'activité est requis." });
@@ -464,6 +637,7 @@ app.post('/api/admin/delegation-events', async (req: Request, res: Response) => 
       date: date ? String(date) : null,
       location: location ? String(location) : null,
       description: description ? String(description) : null,
+      images: images && Array.isArray(images) ? images : null,
       createdAt,
     };
 
@@ -961,6 +1135,11 @@ app.post('/api/register', async (req: Request, res: Response) => {
 
     let org: OrgRecord;
     if (existing) {
+      // If the organisation is already claimed (has password), prevent re-registration/overwrite
+      if (existing.orgPasswordHash) {
+        return res.status(409).json({ message: 'Cette organisation est déjà enregistrée et active.' });
+      }
+
       org = {
         ...existing,
         orgName: payload.orgName,
@@ -970,6 +1149,7 @@ app.post('/api/register', async (req: Request, res: Response) => {
         contactEmail: payload.contactEmail || existing.contactEmail,
         contactPhone: payload.contactPhone || existing.contactPhone,
         orgPasswordHash: passwordHash,
+        isActivated: true, // Ensure account is activated upon claim
       };
     } else {
       org = {
@@ -986,7 +1166,7 @@ app.post('/api/register', async (req: Request, res: Response) => {
     try {
       const { transporter, from } = createTransporter();
       const subject = 'Votre Identifiant Unique - Portail HUMANITAIRES Sila';
-      const text = `Bonjour,\n\nVotre organisation a été enregistrée.\nID: ${org.orgId}\n\nMerci.`;
+      const text = `Bonjour,\n\nVotre organisation a été enregistrée et votre compte est maintenant actif.\n\nVotre Identifiant Unique (ID): ${org.orgId}\n\nVous pouvez désormais vous connecter sur le portail avec cet identifiant et le mot de passe que vous avez choisi.\n\nMerci.`;
       await transporter.sendMail({ from, to: org.contactEmail, subject, text });
     } catch (err) {
       console.error('SMTP configuration error', err);

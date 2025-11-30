@@ -103,6 +103,23 @@ export interface AdminSession {
   username: string;
 }
 
+export interface Activity {
+  id: string;
+  type: 'delegation' | 'partner';
+  title: string;
+  category?: string;
+  description?: string;
+  image?: string;
+  images?: string[];
+  link?: string;
+  date?: string;
+  location?: string;
+  orgName?: string;
+  projectName?: string;
+  govServices?: string;
+  status?: 'completed' | 'ongoing' | 'upcoming';
+}
+
 export interface ProjectManagerSession {
   orgId: string;
   orgName: string;

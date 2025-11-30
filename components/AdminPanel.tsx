@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+
 import {
   Calendar,
   MapPin,
@@ -19,6 +20,7 @@ import {
   adminResetOrgPassword,
   adminListDelegationEvents,
   adminCreateDelegationEvent,
+  uploadDelegationEventImage,
   DelegationEvent,
   adminSaveProvinceMonthlyStats,
   adminGetProvinceStructuralStats,
@@ -29,8 +31,14 @@ import {
   adminListActivitiesPaged,
 } from '../services/api';
 import { PublicLayout } from './PublicLayout';
+import { AdminProvinceStatsSection } from './admin/AdminProvinceStatsSection';
+import { AdminPopulationManagementSection } from './admin/AdminPopulationManagementSection';
 
-type AdminSection = 'accounts' | 'orgs' | 'projects' | 'events' | 'delegationEvents';
+type AdminSection = 'accounts' | 'orgs' | 'projects' | 'events' | 'delegationEvents' | 'population';
+
+interface AdminPanelProps {
+  initialSection?: AdminSection;
+}
 
 // --- Helper Components ---
 
@@ -65,7 +73,8 @@ const SectionHeader: React.FC<{ title: string; subtitle?: string; action?: React
 
 // --- Main Component ---
 
-export const AdminPanel: React.FC = () => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ initialSection }) => {
+
   // State: Orgs & Accounts
   const [orgs, setOrgs] = useState<any[]>([]);
   const [orgLoading, setOrgLoading] = useState(false);
@@ -106,7 +115,16 @@ export const AdminPanel: React.FC = () => {
   const [accountSearch, setAccountSearch] = useState('');
 
   // State: Navigation
-  const [activeSection, setActiveSection] = useState<AdminSection>('orgs');
+  const [activeSection, setActiveSection] = useState<AdminSection>(initialSection || 'orgs');
+
+  const sectionToSlug: Record<AdminSection, string> = {
+    accounts: 'comptes',
+    orgs: 'statistiques',
+    projects: 'projets',
+    events: 'activites-projets',
+    delegationEvents: 'activites-delegation',
+    population: 'population',
+  };
 
   // State: Delegation Events
   const [delegationEvents, setDelegationEvents] = useState<DelegationEvent[]>([]);
@@ -117,6 +135,7 @@ export const AdminPanel: React.FC = () => {
     date: '',
     location: '',
     description: '',
+    images: [] as File[],
   });
 
   // State: Statistics (Sila Province)
@@ -130,8 +149,9 @@ export const AdminPanel: React.FC = () => {
   const statsNewReturnees = typeof statsReturneesTotal === 'number' && typeof statsReturneesPrevTotal === 'number'
     ? Math.max(statsReturneesTotal - statsReturneesPrevTotal, 0) : '';
 
-  const [statsMonth, setStatsMonth] = useState<string>('');
-  const [statsYear, setStatsYear] = useState<number | ''>('');
+  const now = new Date();
+  const [statsMonth, setStatsMonth] = useState<string>(String(now.getMonth() + 1).padStart(2, '0'));
+  const [statsYear, setStatsYear] = useState<number | ''>(now.getFullYear());
 
   const [structPopulation, setStructPopulation] = useState<number | ''>('');
   const [structDisabled, setStructDisabled] = useState<number | ''>('');
@@ -455,59 +475,55 @@ export const AdminPanel: React.FC = () => {
 
   return (
     <PublicLayout
-      adminHeader={(
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-          <div>
-            <h1 className="text-lg font-extrabold text-[#002060] tracking-tight flex items-center gap-2">
-              <span className="w-2 h-6 bg-[#FECB00] rounded-sm inline-block"></span>
-              Tableau de bord de l'administration
-            </h1>
-            <p className="text-xs text-gray-500 mt-1 pl-4 max-w-2xl">
-              Gestion centralisée des partenaires, statistiques provinciales et suivi des projets dans le Sila.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex gap-2 text-[10px] font-medium text-gray-500 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
-              <span>Organisations: <b className="text-[#002060]">{orgs.length}</b></span>
-              <span className="w-px h-3 bg-gray-300 self-center"></span>
-              <span>Projets: <b className="text-[#002060]">{projects.length}</b></span>
-            </div>
-            <button
-              type="button"
-              onClick={() => { window.location.href = '/admin'; }}
-              className="px-4 py-1.5 rounded-md text-[11px] font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
-            >
-              Se déconnecter
-            </button>
-          </div>
-        </div>
-      )}
+      adminHeader={null}
       adminTabs={(
-        <div className="flex items-center overflow-x-auto whitespace-nowrap gap-0">
-          {[
-            { id: 'accounts', label: 'GESTION DES COMPTES' },
-            { id: 'orgs', label: 'STATISTIQUES PROVINCE SILA' },
-            { id: 'projects', label: 'PROJETS' },
-            { id: 'events', label: 'ACTIVITÉS DES PROJETS' },
-            { id: 'delegationEvents', label: 'ACTIVITÉS DE LA DÉLÉGATION' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setActiveSection(tab.id as AdminSection);
-                if (tab.id === 'projects') loadProjectsPage(1, projectSearch);
-                if (tab.id === 'events') loadActivitiesPage(1, activitySearch);
-                if (tab.id === 'delegationEvents') loadDelegationEvents();
-              }}
-              className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide border-x border-blue-900/40 transition-colors ${activeSection === tab.id
-                  ? 'bg-[#FECB00] text-[#002060] shadow-sm'
-                  : 'bg-transparent text-white/80 hover:bg-white/10 hover:text-white'
-                }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center overflow-x-auto whitespace-nowrap gap-0">
+            {[
+              { id: 'accounts', label: 'GESTION DES COMPTES' },
+              { id: 'orgs', label: 'STATISTIQUES PROVINCE SILA' },
+              { id: 'population', label: 'POPULATION' },
+              { id: 'projects', label: 'PROJETS' },
+              { id: 'events', label: 'ACTIVITÉS DES PROJETS' },
+              { id: 'delegationEvents', label: 'ACTIVITÉS DE LA DÉLÉGATION' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  const nextSection = tab.id as AdminSection;
+                  setActiveSection(nextSection);
+                  try {
+                    const slug = sectionToSlug[nextSection];
+                    const nextPath = `/admin/panel/${slug}`;
+                    if (window.location.pathname !== nextPath) {
+                      window.history.pushState(null, '', nextPath);
+                    }
+                  } catch {
+                    // ignore history errors in non-browser environments
+                  }
+                  if (tab.id === 'projects') loadProjectsPage(1, projectSearch);
+                  if (tab.id === 'events') loadActivitiesPage(1, activitySearch);
+                  if (tab.id === 'delegationEvents') loadDelegationEvents();
+                }}
+
+                className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide border-x border-blue-900/40 transition-colors ${activeSection === tab.id
+                    ? 'bg-[#FECB00] text-[#002060] shadow-sm'
+                    : 'bg-transparent text-white/80 hover:bg-white/10 hover:text-white'
+                  }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => { window.location.href = '/admin'; }}
+            className="ml-3 px-4 py-1.5 rounded-md text-[11px] font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors whitespace-nowrap"
+          >
+            Se déconnecter
+          </button>
         </div>
       )}
     >
@@ -698,167 +714,66 @@ export const AdminPanel: React.FC = () => {
 
           {/* === SECTION 2: STATS === */}
           {activeSection === 'orgs' && (
-            <div className="space-y-6">
-              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <SectionHeader title="Statistiques Province Sila" subtitle="Mise à jour des données démographiques et humanitaires." />
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* STRUCTURAL STATS */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-2 border-b border-gray-100 pb-2">
-                      <MapPin className="h-4 w-4 text-[#FECB00]" />
-                      <h3 className="text-xs font-bold text-gray-800 uppercase">Données Structurelles (Fixes)</h3>
-                    </div>
-
-                    <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className={labelClassName}>Population Totale</label>
-                          <input type="number" min={0} value={typeof structPopulation === 'number' ? structPopulation : ''} onChange={(e) => { const v = e.target.value === '' ? '' : Number(e.target.value); setStructPopulation(Number.isNaN(v as number) ? '' : (v as number)); }} className={inputClassName} />
-                        </div>
-                        <div>
-                          <label className={labelClassName}>Personnes Handicapées</label>
-                          <input type="number" min={0} value={typeof structDisabled === 'number' ? structDisabled : ''} onChange={(e) => { const v = e.target.value === '' ? '' : Number(e.target.value); setStructDisabled(Number.isNaN(v as number) ? '' : (v as number)); }} className={inputClassName} />
-                        </div>
-                        <div>
-                          <label className={labelClassName}>Affectés Inondations</label>
-                          <input type="number" min={0} value={typeof structFloodAffected === 'number' ? structFloodAffected : ''} onChange={(e) => { const v = e.target.value === '' ? '' : Number(e.target.value); setStructFloodAffected(Number.isNaN(v as number) ? '' : (v as number)); }} className={inputClassName} />
-                        </div>
-                        <div>
-                          <label className={labelClassName}>Affectés Incendies</label>
-                          <input type="number" min={0} value={typeof structFireAffected === 'number' ? structFireAffected : ''} onChange={(e) => { const v = e.target.value === '' ? '' : Number(e.target.value); setStructFireAffected(Number.isNaN(v as number) ? '' : (v as number)); }} className={inputClassName} />
-                        </div>
-                      </div>
-                      <div>
-                        <label className={labelClassName}>Très Vulnérables</label>
-                        <input type="number" min={0} value={typeof structVeryVulnerable === 'number' ? structVeryVulnerable : ''} onChange={(e) => { const v = e.target.value === '' ? '' : Number(e.target.value); setStructVeryVulnerable(Number.isNaN(v as number) ? '' : (v as number)); }} className={inputClassName} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* MONTHLY STATS */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-2 border-b border-gray-100 pb-2">
-                      <Calendar className="h-4 w-4 text-[#FECB00]" />
-                      <h3 className="text-xs font-bold text-gray-800 uppercase">Mise à jour Mensuelle</h3>
-                    </div>
-
-                    <div className="bg-white border border-blue-100 rounded-lg p-4 shadow-sm space-y-4">
-                      <div className="flex gap-3">
-                        <div className="w-2/3">
-                          <label className={labelClassName}>Mois</label>
-                          <select className={inputClassName} value={statsMonth} onChange={(e) => setStatsMonth(e.target.value)}>
-                            <option value="" disabled>Sélectionner</option>
-                            {['Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre'].map((m, i) => (
-                              <option key={i} value={(i + 1).toString().padStart(2, '0')}>{m}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="w-1/3">
-                          <label className={labelClassName}>Année</label>
-                          <input type="number" min={2020} max={2100} value={statsYear === '' ? '' : statsYear} onChange={(e) => { const v = e.target.value === '' ? '' : Number(e.target.value); setStatsYear(Number.isNaN(v as number) ? '' : (v as number)); }} className={inputClassName} />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 p-3 bg-blue-50/50 rounded border border-blue-100">
-                        <div>
-                          <label className={labelClassName}>Total Réfugiés</label>
-                          <input type="number" min={0} value={typeof statsRefugeesTotal === 'number' ? statsRefugeesTotal : ''} onChange={(e) => { const v = e.target.value === '' ? '' : Number(e.target.value); setStatsRefugeesTotal(Number.isNaN(v as number) ? '' : (v as number)); }} className={inputClassName} />
-                        </div>
-                        <div>
-                          <label className={labelClassName}>Nouveaux (Calc)</label>
-                          <input type="number" value={statsNewRefugees} readOnly className={`${inputClassName} bg-gray-100 text-gray-500`} />
-                        </div>
-                        <div>
-                          <label className={labelClassName}>Total Retournés</label>
-                          <input type="number" min={0} value={typeof statsReturneesTotal === 'number' ? statsReturneesTotal : ''} onChange={(e) => { const v = e.target.value === '' ? '' : Number(e.target.value); setStatsReturneesTotal(Number.isNaN(v as number) ? '' : (v as number)); }} className={inputClassName} />
-                        </div>
-                        <div>
-                          <label className={labelClassName}>Nouveaux (Calc)</label>
-                          <input type="number" value={statsNewReturnees} readOnly className={`${inputClassName} bg-gray-100 text-gray-500`} />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end">
-                        <ActionButton
-                          onClick={async () => {
-                            try {
-                              if (!statsMonth || statsYear === '' || !Number.isFinite(statsYear as number)) {
-                                alert('Veuillez selectionner un mois et une annee valides.');
-                                return;
-                              }
-                              await adminSaveProvinceMonthlyStats({
-                                month: statsMonth,
-                                year: statsYear as number,
-                                totalRefugees: typeof statsRefugeesTotal === 'number' && statsRefugeesTotal >= 0 ? statsRefugeesTotal : 0,
-                                newRefugees: typeof statsNewRefugees === 'number' && statsNewRefugees >= 0 ? statsNewRefugees : 0,
-                                totalReturnees: typeof statsReturneesTotal === 'number' && statsReturneesTotal >= 0 ? statsReturneesTotal : 0,
-                                newReturnees: typeof statsNewReturnees === 'number' && statsNewReturnees >= 0 ? statsNewReturnees : 0,
-                              });
-                              alert('Statistiques mensuelles enregistrees avec succes.');
-                              // Reload history
-                              const list = await adminListProvinceMonthlyStats();
-                              setMonthlyStatsHistory(list || []);
-                            } catch (err: any) {
-                              alert(err?.message || "Echec de l'enregistrement.");
-                            }
-                          }}
-                        >
-                          <Save className="h-3 w-3 mr-1" /> Enregistrer le mois
-                        </ActionButton>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* HISTORY TABLE */}
-                <div className="mt-8 pt-6 border-t border-gray-100">
-                  <h3 className="text-xs font-bold text-gray-800 uppercase mb-3">Historique Mensuel</h3>
-                  <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr className="text-[10px] uppercase tracking-wider text-gray-500">
-                          <th className="px-4 py-2 text-left font-bold">Période</th>
-                          <th className="px-4 py-2 text-right font-bold">Total Réfugiés</th>
-                          <th className="px-4 py-2 text-right font-bold text-emerald-600">Nouv. Réfugiés</th>
-                          <th className="px-4 py-2 text-right font-bold">Total Retournés</th>
-                          <th className="px-4 py-2 text-right font-bold text-emerald-600">Nouv. Retournés</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-100">
-                        {monthlyStatsHistory.map((row, idx) => {
-                          const monthNames: Record<string, string> = { '01': 'Janvier', '02': 'Fevrier', '03': 'Mars', '04': 'Avril', '05': 'Mai', '06': 'Juin', '07': 'Juillet', '08': 'Aout', '09': 'Septembre', '10': 'Octobre', '11': 'Novembre', '12': 'Decembre' };
-                          return (
-                            <tr key={`${row.year}-${row.month}-${idx}`} className="hover:bg-gray-50">
-                              <td className="px-4 py-2 text-[11px] font-medium text-gray-900">
-                                {monthNames[row.month] || row.month} {row.year}
-                              </td>
-                              <td className="px-4 py-2 text-right text-[11px] font-mono text-gray-600">{row.totalRefugees}</td>
-                              <td className="px-4 py-2 text-right text-[11px] font-mono text-emerald-700 bg-emerald-50/30">{row.newRefugees}</td>
-                              <td className="px-4 py-2 text-right text-[11px] font-mono text-gray-600">{row.totalReturnees}</td>
-                              <td className="px-4 py-2 text-right text-[11px] font-mono text-emerald-700 bg-emerald-50/30">{row.newReturnees}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </section>
-            </div>
+            <AdminProvinceStatsSection
+              structPopulation={structPopulation}
+              setStructPopulation={setStructPopulation}
+              structDisabled={structDisabled}
+              setStructDisabled={setStructDisabled}
+              structFloodAffected={structFloodAffected}
+              setStructFloodAffected={setStructFloodAffected}
+              structFireAffected={structFireAffected}
+              setStructFireAffected={setStructFireAffected}
+              structVeryVulnerable={structVeryVulnerable}
+              setStructVeryVulnerable={setStructVeryVulnerable}
+              statsMonth={statsMonth}
+              setStatsMonth={setStatsMonth}
+              statsYear={statsYear}
+              setStatsYear={setStatsYear}
+              statsRefugeesTotal={statsRefugeesTotal}
+              setStatsRefugeesTotal={setStatsRefugeesTotal}
+              statsNewRefugees={statsNewRefugees as number}
+              statsReturneesTotal={statsReturneesTotal}
+              setStatsReturneesTotal={setStatsReturneesTotal}
+              statsNewReturnees={statsNewReturnees as number}
+              monthlyStatsHistory={monthlyStatsHistory}
+              setMonthlyStatsHistory={setMonthlyStatsHistory}
+              adminSaveProvinceMonthlyStats={adminSaveProvinceMonthlyStats}
+              adminListProvinceMonthlyStats={adminListProvinceMonthlyStats}
+              SectionHeader={SectionHeader}
+              ActionButton={ActionButton}
+              inputClassName={inputClassName}
+              labelClassName={labelClassName}
+            />
           )}
 
-          {/* === SECTION 3: PROJECTS === */}
+          {/* === SECTION 3: POPULATION === */}
+          {activeSection === 'population' && (
+            <AdminPopulationManagementSection
+              SectionHeader={SectionHeader}
+              ActionButton={ActionButton}
+              inputClassName={inputClassName}
+              labelClassName={labelClassName}
+            />
+          )}
+
+          {/* === SECTION 4: PROJECTS === */}
           {activeSection === 'projects' && (
             <div className="space-y-6">
-              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <SectionHeader
-                  title="Répertoire des Projets"
-                  subtitle="Vue d'ensemble des projets déclarés par les partenaires."
-                  action={
+              <section className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                <div className="bg-gradient-to-r from-[#002060] to-[#003080] px-6 py-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        <div className="w-8 h-8 bg-[#FECB00] rounded-lg flex items-center justify-center">
+                          <span className="text-[#002060] text-sm font-bold">📋</span>
+                        </div>
+                        Répertoire des Projets
+                      </h2>
+                      <p className="text-blue-100 text-sm mt-1">Vue d'ensemble des projets déclarés par les partenaires</p>
+                    </div>
                     <div className="flex gap-2">
                       <div className="relative">
-                        <Filter className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-gray-400" />
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-blue-200" />
                         <input
                           type="text"
                           value={projectSearch}
@@ -870,235 +785,528 @@ export const AdminPanel: React.FC = () => {
                               loadProjectsPage(1, projectSearch);
                             }
                           }}
-                          placeholder="Filtrer..."
-                          className="pl-8 w-56 border border-gray-300 rounded-md py-1.5 text-[11px] focus:ring-[#002060] focus:border-[#002060]"
+                          placeholder="Rechercher un projet..."
+                          className="pl-10 w-64 bg-blue-50/20 border border-blue-200/30 rounded-lg py-2 text-sm text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
                         />
                       </div>
                       <ActionButton
                         variant="secondary"
                         disabled={projectsLoading}
                         onClick={async () => {
-                          // 1. افتح النافذة فوراً قبل أي عملية انتظار (await)
                           const popup = window.open('', '_blank');
-                          
                           if (!popup) {
                             alert('Le navigateur a bloqué la fenêtre de téléchargement. Veuillez autoriser les pop-ups.');
                             return;
                           }
-
-                          // 2. اعرض رسالة انتظار داخل النافذة
-                          popup.document.write('<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;"><h3>Génération du PDF en cours...<br>Veuillez patienter...</h3></body></html>');
-
+                          popup.document.write('<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#002060;color:white;"><h3>Génération du PDF en cours...<br>Veuillez patienter...</h3></body></html>');
                           try {
-                            // 3. جلب البيانات
                             const q = projectSearch.trim();
                             const res = await adminListProjectsPaged(1, 5000, q);
-                            
-                            // 4. استدعاء دالة الطباعة وتمرير النافذة المفتوحة
                             exportProjectsToPdf(res.items || [], popup);
                           } catch (err) {
                             console.error('Export projects error', err);
                             popup.document.body.innerHTML = '<h3 style="color:red">Erreur lors de la récupération des données.</h3>';
                           }
                         }}
+                        className="bg-white/10 hover:bg-white/20 text-white border border-white/20"
                       >
-                        <Download className="h-3.5 w-3.5 text-gray-600" />
+                        <Download className="h-4 w-4" />
                       </ActionButton>
                     </div>
-                  }
-                />
+                  </div>
+                </div>
 
-                {projectsLoading ? (
-                  <div className="text-center py-10 text-gray-400 text-xs animate-pulse">Chargement des données...</div>
-                ) : projects.length === 0 ? (
-                  <div className="text-center py-10 text-gray-400 text-xs bg-gray-50 rounded-lg">Aucun projet enregistré.</div>
-                ) : (
-                  (() => {
-                    const totalPages = Math.max(1, Math.ceil(projectTotal / projectPageSize));
-                    const currentPage = Math.min(projectPage, totalPages);
-                    const visibleProjects = projects;
+                <div className="p-6">
+                  {projectsLoading ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#002060] mb-4"></div>
+                      <p className="text-gray-500 text-sm">Chargement des projets...</p>
+                    </div>
+                  ) : projects.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl">📂</span>
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-700 mb-2">Aucun projet trouvé</h3>
+                      <p className="text-gray-500 text-sm">Aucun projet n'a été enregistré par les partenaires.</p>
+                    </div>
+                  ) : (
+                    (() => {
+                      const totalPages = Math.max(1, Math.ceil(projectTotal / projectPageSize));
+                      const currentPage = Math.min(projectPage, totalPages);
+                      const visibleProjects = projects;
 
-                    return (
-                      <>
-                        <div className="flex justify-between items-center text-[10px] text-gray-500 mb-2 px-1">
-                          <span>Affichage {visibleProjects.length} sur {projectTotal} projets</span>
-                          <div className="flex gap-2">
-                            <button
-                              disabled={currentPage <= 1}
-                              onClick={() => loadProjectsPage(currentPage - 1, projectSearch)}
-                              className="hover:text-blue-700 disabled:opacity-30"
-                            >
-                              Précédent
-                            </button>
-                            <span>Page {currentPage} / {totalPages}</span>
-                            <button
-                              disabled={currentPage >= totalPages}
-                              onClick={() => loadProjectsPage(currentPage + 1, projectSearch)}
-                              className="hover:text-blue-700 disabled:opacity-30"
-                            >
-                              Suivant
-                            </button>
+                      return (
+                        <>
+                          <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-2">
+                              <div className="bg-blue-50 px-3 py-1 rounded-full">
+                                <span className="text-sm font-semibold text-blue-700">
+                                  {visibleProjects.length} sur {projectTotal} projets
+                                </span>
+                              </div>
+                              {projectSearch && (
+                                <div className="bg-amber-50 px-3 py-1 rounded-full">
+                                  <span className="text-sm font-semibold text-amber-700">
+                                    Filtré: "{projectSearch}"
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                disabled={currentPage <= 1}
+                                onClick={() => loadProjectsPage(currentPage - 1, projectSearch)}
+                                className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                ← Précédent
+                              </button>
+                              <span className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg">
+                                Page {currentPage} / {totalPages}
+                              </span>
+                              <button
+                                disabled={currentPage >= totalPages}
+                                onClick={() => loadProjectsPage(currentPage + 1, projectSearch)}
+                                className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                Suivant →
+                              </button>
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="border border-gray-200 rounded-lg overflow-hidden">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr className="text-[10px] uppercase tracking-wider text-gray-500">
-                                <th className="px-4 py-3 text-left font-bold">Projet</th>
-                                <th className="px-4 py-3 text-left font-bold w-[120px]">Type</th>
-                                <th className="px-4 py-3 text-left font-bold w-[150px]">Secteur</th>
-                                <th className="px-4 py-3 text-left font-bold w-[100px]">ID</th>
-                                <th className="px-4 py-3 text-left font-bold w-[180px]">Organisation</th>
-                                <th className="w-[40px]"></th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-100">
-                              {visibleProjects.length === 0 ? (
-                                <tr><td colSpan={6} className="text-center py-4 text-xs text-gray-400">Aucun résultat.</td></tr>
-                              ) : (
-                                visibleProjects.map((p) => (
-                                  <React.Fragment key={`${p.orgId}-${p.id}`}>
-                                    <tr
-                                      onClick={() => setExpandedProjectId(prev => prev === p.id ? null : p.id)}
-                                      className={`cursor-pointer transition-colors ${expandedProjectId === p.id ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
-                                    >
-                                      <td className="px-4 py-3 text-[11px] font-bold text-[#002060]">{p.projectName || p.id}</td>
-                                      <td className="px-4 py-3 text-[10px] text-gray-600">{p.type}</td>
-                                      <td className="px-4 py-3 text-[10px] text-gray-600"><span className="bg-gray-100 px-2 py-0.5 rounded-full">{p.sector}</span></td>
-                                      <td className="px-4 py-3 text-[10px] font-mono text-gray-500">{p.id}</td>
-                                      <td className="px-4 py-3 text-[10px] font-bold text-gray-700">{p.orgName}</td>
-                                      <td className="px-2 text-center text-gray-400">
-                                        {expandedProjectId === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                      </td>
-                                    </tr>
-                                    {expandedProjectId === p.id && (
-                                      <tr className="bg-blue-50/20">
-                                        <td colSpan={6} className="px-4 py-4">
-                                          <div className="bg-white border border-blue-100 rounded-md p-4 shadow-inner">
-                                            <h4 className="text-xs font-bold text-[#002060] mb-2 uppercase border-b border-gray-100 pb-1">Détails du Projet</h4>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-3 gap-x-6 text-[11px] text-gray-600">
-                                              <div className="col-span-full mb-1">
-                                                <span className="font-bold text-gray-800 block mb-0.5">Description:</span>
-                                                <p className="leading-relaxed">{p.projectDescription || 'N/A'}</p>
-                                              </div>
-                                              <div><span className="font-bold text-gray-800">Localisation:</span> {p.location}</div>
-                                              <div><span className="font-bold text-gray-800">Bénéficiaires (Type):</span> {p.beneficiariesType}</div>
-                                              <div><span className="font-bold text-gray-800">Bénéficiaires (Prévus):</span> {p.beneficiariesPlanned}</div>
-                                              <div><span className="font-bold text-gray-800">Chef de Projet:</span> {p.projectManagerName || '-'}</div>
-                                              <div><span className="font-bold text-gray-800">Contact:</span> {p.projectManagerPhone || '-'}</div>
+                          <div className="grid gap-4">
+                            {visibleProjects.length === 0 ? (
+                              <div className="text-center py-8 bg-gray-50 rounded-lg">
+                                <p className="text-gray-500 text-sm">Aucun résultat pour cette recherche.</p>
+                              </div>
+                            ) : (
+                              visibleProjects.map((p) => (
+                                <div
+                                  key={`${p.orgId}-${p.id}`}
+                                  className="group bg-white border border-gray-200 rounded-xl hover:shadow-lg hover:border-[#002060]/20 transition-all duration-200 overflow-hidden"
+                                >
+                                  <div
+                                    onClick={() => setExpandedProjectId(prev => prev === p.id ? null : p.id)}
+                                    className="p-6 cursor-pointer"
+                                  >
+                                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                      <div className="flex-1">
+                                        <div className="flex items-start gap-4">
+                                          <div className="w-12 h-12 bg-gradient-to-br from-[#002060] to-[#003080] rounded-lg flex items-center justify-center flex-shrink-0">
+                                            <span className="text-white font-bold text-lg">
+                                              {(p.orgName || '').charAt(0).toUpperCase()}
+                                            </span>
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#002060] transition-colors mb-1">
+                                              {p.projectName || p.id}
+                                            </h3>
+                                            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                                              <span className="font-medium text-gray-700">{p.orgName}</span>
+                                              <span className="text-gray-400">•</span>
+                                              <span className="bg-gray-100 px-2 py-1 rounded-full text-xs font-medium">
+                                                {p.sector}
+                                              </span>
+                                              <span className="text-gray-400">•</span>
+                                              <span className="text-xs font-mono text-gray-500">
+                                                ID: {p.id}
+                                              </span>
                                             </div>
                                           </div>
-                                        </td>
-                                      </tr>
-                                    )}
-                                  </React.Fragment>
-                                ))
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </>
-                    );
-                  })()
-                )}
-              </section>
-            </div>
-          )}
-
-          {/* === SECTION 4: DELEGATION EVENTS === */}
-          {activeSection === 'delegationEvents' && (
-            <div className="space-y-6">
-              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-xs">
-                <SectionHeader title="Activités de la Délégation" subtitle="Journal des événements officiels et réunions de coordination." />
-
-                {delegationEventError && (
-                  <div className="mb-4 bg-red-50 text-red-700 p-3 rounded text-xs border border-red-100">{delegationEventError}</div>
-                )}
-
-                <form
-                  className="mb-8 bg-gray-50 border border-gray-200 rounded-lg p-5"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!delegationEventForm.title.trim()) return;
-                    try {
-                      await adminCreateDelegationEvent({
-                        title: delegationEventForm.title.trim(),
-                        date: delegationEventForm.date || undefined,
-                        location: delegationEventForm.location || undefined,
-                        description: delegationEventForm.description || undefined,
-                      });
-                      setDelegationEventForm({ title: '', date: '', location: '', description: '' });
-                      loadDelegationEvents();
-                    } catch (err: any) {
-                      setDelegationEventError(err?.message || "Erreur création");
-                    }
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-3">
-                    <Plus className="h-4 w-4 text-[#002060]" />
-                    <h3 className="text-xs font-bold text-gray-700 uppercase">Nouvelle Activité</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-[2fr,1fr,1fr] gap-4 mb-3">
-                    <div>
-                      <label className={labelClassName}>Titre</label>
-                      <input type="text" required placeholder="Ex: Réunion mensuelle" value={delegationEventForm.title} onChange={e => setDelegationEventForm(prev => ({ ...prev, title: e.target.value }))} className={inputClassName} />
-                    </div>
-                    <div>
-                      <label className={labelClassName}>Date</label>
-                      <input type="date" value={delegationEventForm.date} onChange={e => setDelegationEventForm(prev => ({ ...prev, date: e.target.value }))} className={inputClassName} />
-                    </div>
-                    <div>
-                      <label className={labelClassName}>Lieu</label>
-                      <input type="text" placeholder="Goz Beida..." value={delegationEventForm.location} onChange={e => setDelegationEventForm(prev => ({ ...prev, location: e.target.value }))} className={inputClassName} />
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <label className={labelClassName}>Description</label>
-                    <textarea rows={2} placeholder="Détails..." value={delegationEventForm.description} onChange={e => setDelegationEventForm(prev => ({ ...prev, description: e.target.value }))} className={inputClassName} />
-                  </div>
-                  <div className="flex justify-end">
-                    <ActionButton type="submit" disabled={delegationEventsLoading || !delegationEventForm.title.trim()}>Enregistrer l'activité</ActionButton>
-                  </div>
-                </form>
-
-                <div className="mt-3">
-                  {delegationEventsLoading ? (
-                    <div className="text-center py-8 text-gray-400 text-xs">Chargement...</div>
-                  ) : delegationEvents.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400 text-xs bg-gray-50 rounded">Aucune activité enregistrée.</div>
-                  ) : (
-                    <div className="grid gap-3">
-                      {delegationEvents.map((ev) => (
-                        <div key={ev.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row gap-4">
-                          <div className="flex-1">
-                            <h4 className="text-sm font-bold text-[#002060]">{ev.title}</h4>
-                            <p className="text-[11px] text-gray-600 mt-1">{ev.description || <span className="italic text-gray-400">Pas de description</span>}</p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-4">
+                                        <div className="text-right">
+                                          <div className="text-xs text-gray-500 mb-1">Type</div>
+                                          <div className="text-sm font-medium text-gray-700">{p.type}</div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-xs text-gray-500 mb-1">Localisation</div>
+                                          <div className="text-sm font-medium text-gray-700">{p.location || 'N/A'}</div>
+                                        </div>
+                                        <button className="p-2 text-gray-400 hover:text-[#002060] transition-colors">
+                                          {expandedProjectId === p.id ? (
+                                            <ChevronUp className="h-5 w-5" />
+                                          ) : (
+                                            <ChevronDown className="h-5 w-5" />
+                                          )}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {expandedProjectId === p.id && (
+                                    <div className="border-t border-gray-100 bg-gradient-to-br from-gray-50 to-blue-50/20 p-6">
+                                      <div className="bg-white rounded-lg p-5 border border-blue-100">
+                                        <h4 className="text-sm font-bold text-[#002060] mb-4 flex items-center gap-2">
+                                          <span>📊</span>
+                                          Détails du Projet
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                          <div className="space-y-3">
+                                            <h5 className="text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200 pb-1">
+                                              Informations Générales
+                                            </h5>
+                                            <div className="space-y-2">
+                                              <div className="flex justify-between">
+                                                <span className="text-xs text-gray-500">Organisation:</span>
+                                                <span className="text-xs font-medium text-gray-900">{p.orgName}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="text-xs text-gray-500">Type:</span>
+                                                <span className="text-xs font-medium text-gray-900">{p.type}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="text-xs text-gray-500">Secteur:</span>
+                                                <span className="text-xs font-medium text-gray-900">{p.sector}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="text-xs text-gray-500">Localisation:</span>
+                                                <span className="text-xs font-medium text-gray-900">{p.location || 'N/A'}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                          
+                                          <div className="space-y-3">
+                                            <h5 className="text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200 pb-1">
+                                              Bénéficiaires
+                                            </h5>
+                                            <div className="space-y-2">
+                                              <div className="flex justify-between">
+                                                <span className="text-xs text-gray-500">Type:</span>
+                                                <span className="text-xs font-medium text-gray-900">{p.beneficiariesType || 'N/A'}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="text-xs text-gray-500">Prévus:</span>
+                                                <span className="text-xs font-medium text-gray-900">{p.beneficiariesPlanned || 'N/A'}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                          
+                                          <div className="space-y-3">
+                                            <h5 className="text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200 pb-1">
+                                              Coordination
+                                            </h5>
+                                            <div className="space-y-2">
+                                              <div className="flex justify-between">
+                                                <span className="text-xs text-gray-500">Chef de projet:</span>
+                                                <span className="text-xs font-medium text-gray-900">{p.projectManagerName || 'N/A'}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="text-xs text-gray-500">Contact:</span>
+                                                <span className="text-xs font-medium text-gray-900">{p.projectManagerPhone || 'N/A'}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {p.projectDescription && (
+                                          <div className="mt-4 pt-4 border-t border-gray-100">
+                                            <h5 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Description</h5>
+                                            <p className="text-sm text-gray-600 leading-relaxed">{p.projectDescription}</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))
+                            )}
                           </div>
-                          <div className="flex flex-row md:flex-col gap-2 md:gap-1 text-[10px] text-gray-500 md:w-40 md:text-right md:border-l md:border-gray-100 md:pl-4 justify-between md:justify-center">
-                            <div className="flex items-center md:justify-end gap-1"><Calendar className="h-3 w-3" /> {ev.date || 'N/A'}</div>
-                            <div className="flex items-center md:justify-end gap-1"><MapPin className="h-3 w-3" /> {ev.location || 'N/A'}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        </>
+                      );
+                    })()
                   )}
                 </div>
               </section>
             </div>
           )}
 
-          {/* === SECTION 5: PROJECT ACTIVITIES === */}
+          {/* === SECTION 5: DELEGATION EVENTS === */}
+          {activeSection === 'delegationEvents' && (
+            <div className="space-y-6">
+              <section className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                <div className="bg-gradient-to-r from-[#002060] to-[#003080] px-6 py-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        <div className="w-8 h-8 bg-[#FECB00] rounded-lg flex items-center justify-center">
+                          <span className="text-[#002060] text-sm font-bold">🤝</span>
+                        </div>
+                        Activités de la Délégation
+                      </h2>
+                      <p className="text-blue-100 text-sm mt-1">Journal des événements officiels et réunions de coordination</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  {delegationEventError && (
+                    <div className="mb-6 bg-red-50 border border-red-100 text-red-700 p-4 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">⚠️</span>
+                        <span className="text-sm font-medium">{delegationEventError}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <form
+                    className="mb-8 bg-gradient-to-br from-gray-50 to-blue-50/30 border border-gray-200 rounded-xl p-6"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!delegationEventForm.title.trim()) return;
+                      
+                      try {
+                        // Upload images first if any
+                        const imageUrls: string[] = [];
+                        if (delegationEventForm.images && delegationEventForm.images.length > 0) {
+                          for (const file of delegationEventForm.images) {
+                            if (file instanceof File) {
+                              const result = await uploadDelegationEventImage(file);
+                              imageUrls.push(result.url);
+                            }
+                          }
+                        }
+
+                        await adminCreateDelegationEvent({
+                          title: delegationEventForm.title.trim(),
+                          date: delegationEventForm.date || undefined,
+                          location: delegationEventForm.location || undefined,
+                          description: delegationEventForm.description || undefined,
+                          images: imageUrls.length > 0 ? imageUrls : undefined,
+                        });
+                        
+                        setDelegationEventForm({ 
+                          title: '', 
+                          date: '', 
+                          location: '', 
+                          description: '',
+                          images: []
+                        });
+                        loadDelegationEvents();
+                      } catch (err: any) {
+                        console.error('Delegation event creation error:', err);
+                        setDelegationEventError(err?.message || "Erreur lors de la création de l'activité");
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 bg-[#002060] rounded-lg flex items-center justify-center">
+                        <Plus className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-[#002060] uppercase tracking-wide">Nouvelle Activité</h3>
+                        <p className="text-xs text-gray-500">Enregistrer un événement ou une réunion</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                      <div className="lg:col-span-2">
+                        <label className={labelClassName}>Titre de l'activité</label>
+                        <input 
+                          type="text" 
+                          required 
+                          placeholder="Ex: Réunion mensuelle de coordination" 
+                          value={delegationEventForm.title} 
+                          onChange={e => setDelegationEventForm(prev => ({ ...prev, title: e.target.value }))} 
+                          className={inputClassName} 
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClassName}>Date</label>
+                        <input 
+                          type="date" 
+                          value={delegationEventForm.date} 
+                          onChange={e => setDelegationEventForm(prev => ({ ...prev, date: e.target.value }))} 
+                          className={inputClassName} 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className={labelClassName}>Lieu</label>
+                        <input 
+                          type="text" 
+                          placeholder="Ex: Salle de conférence, Goz Beida..." 
+                          value={delegationEventForm.location} 
+                          onChange={e => setDelegationEventForm(prev => ({ ...prev, location: e.target.value }))} 
+                          className={inputClassName} 
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClassName}>Images (jusqu'à 3)</label>
+                        <div className="space-y-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            max="3"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length > 3) {
+                                e.target.value = '';
+                                return;
+                              }
+                              setDelegationEventForm(prev => ({ ...prev, images: files }));
+                            }}
+                            className="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#002060] file:text-white hover:file:bg-[#003080]"
+                          />
+                          {delegationEventForm.images && delegationEventForm.images.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {Array.from(delegationEventForm.images).map((file, index) => (
+                                <div key={index} className="relative group">
+                                  <img
+                                    src={file instanceof File ? URL.createObjectURL(file) : ''}
+                                    alt={`Preview ${index + 1}`}
+                                    className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newImages = Array.from(delegationEventForm.images || []);
+                                      newImages.splice(index, 1);
+                                      setDelegationEventForm(prev => ({ ...prev, images: newImages }));
+                                    }}
+                                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mb-6">
+                      <label className={labelClassName}>Description</label>
+                      <textarea 
+                        rows={3} 
+                        placeholder="Décrire l'activité, les participants, les objectifs..." 
+                        value={delegationEventForm.description} 
+                        onChange={e => setDelegationEventForm(prev => ({ ...prev, description: e.target.value }))} 
+                        className={inputClassName} 
+                      />
+                    </div>
+                    
+                    <div className="flex justify-end">
+                      <ActionButton 
+                        type="submit" 
+                        disabled={delegationEventsLoading || !delegationEventForm.title.trim()}
+                        className="px-6"
+                      >
+                        {delegationEventsLoading ? 'Enregistrement...' : 'Enregistrer l\'activité'}
+                      </ActionButton>
+                    </div>
+                  </form>
+
+                  <div className="mt-8">
+                    {delegationEventsLoading ? (
+                      <div className="flex flex-col items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#002060] mb-4"></div>
+                        <p className="text-gray-500 text-sm">Chargement des activités...</p>
+                      </div>
+                    ) : delegationEvents.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <span className="text-2xl">📅</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-700 mb-2">Aucune activité enregistrée</h3>
+                        <p className="text-gray-500 text-sm">Commencez par ajouter une nouvelle activité de délégation.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4">
+                        {delegationEvents.map((ev) => (
+                          <div key={ev.id} className="group bg-white border border-gray-200 rounded-xl hover:shadow-lg hover:border-[#002060]/20 transition-all duration-200 overflow-hidden">
+                            <div className="p-6">
+                              <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start gap-3 mb-3">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-[#002060] to-[#003080] rounded-lg flex items-center justify-center flex-shrink-0">
+                                      <span className="text-white font-bold text-lg">🤝</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#002060] transition-colors mb-1">
+                                        {ev.title}
+                                      </h3>
+                                      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                                        {ev.date && (
+                                          <div className="flex items-center gap-1">
+                                            <Calendar className="h-4 w-4 text-blue-600" />
+                                            <span>{ev.date}</span>
+                                          </div>
+                                        )}
+                                        {ev.location && (
+                                          <div className="flex items-center gap-1">
+                                            <MapPin className="h-4 w-4 text-purple-600" />
+                                            <span>{ev.location}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {ev.description && (
+                                    <p className="text-sm text-gray-600 mb-3 leading-relaxed">
+                                      {ev.description}
+                                    </p>
+                                  )}
+
+                                  {ev.images && ev.images.length > 0 && (
+                                    <div className="mb-3">
+                                      <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Images</h4>
+                                      <div className="flex flex-wrap gap-2">
+                                        {ev.images.map((image, index) => (
+                                          <img
+                                            key={index}
+                                            src={image.startsWith('http') ? image : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${image}`}
+                                            alt={`Activity image ${index + 1}`}
+                                            className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:border-[#002060]/30 transition-colors cursor-pointer"
+                                            onClick={() => window.open(image.startsWith('http') ? image : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${image}`, '_blank')}
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex lg:flex-col gap-2 lg:gap-1">
+                                  <button className="p-2 text-gray-400 hover:text-[#002060] hover:bg-gray-50 rounded-lg transition-colors">
+                                    <span className="text-lg">ℹ️</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* === SECTION 6: PROJECT ACTIVITIES === */}
           {activeSection === 'events' && (
             <div className="space-y-6">
-              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <SectionHeader
-                  title="Activités des Projets"
-                  subtitle="Suivi opérationnel des actions menées par les partenaires."
-                  action={
-                    <div className="flex flex-wrap gap-2 items-center">
+              <section className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                <div className="bg-gradient-to-r from-[#002060] to-[#003080] px-6 py-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        <div className="w-8 h-8 bg-[#FECB00] rounded-lg flex items-center justify-center">
+                          <span className="text-[#002060] text-sm font-bold">📅</span>
+                        </div>
+                        Activités des Projets
+                      </h2>
+                      <p className="text-blue-100 text-sm mt-1">Suivi opérationnel des actions menées par les partenaires</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                       <div className="relative">
-                        <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-gray-400" />
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-blue-200" />
                         <input
                           type="text"
                           value={activitySearch}
@@ -1110,62 +1318,51 @@ export const AdminPanel: React.FC = () => {
                               loadActivitiesPage(1, activitySearch);
                             }
                           }}
-                          placeholder="Rechercher..."
-                          className="pl-8 w-40 border border-gray-300 rounded-md py-1.5 text-[11px] focus:ring-[#002060] focus:border-[#002060]"
+                          placeholder="Rechercher une activité..."
+                          className="pl-10 w-48 bg-blue-50/20 border border-blue-200/30 rounded-lg py-2 text-sm text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
                         />
                       </div>
 
-                      {/* Filtre projet */}
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-semibold text-gray-600">Projet:</span>
-                        <select
-                          value={activityProjectFilter}
-                          onChange={(e) => setActivityProjectFilter(e.target.value)}
-                          className="border border-gray-300 rounded-md py-1 px-2 text-[11px] focus:ring-[#002060] focus:border-[#002060] bg-white"
-                        >
-                          <option value="">Tous</option>
-                          {Array.from(
-                            new Map(
-                              allActivities.map((a) => [
-                                a.projectId,
-                                a.projectName || a.projectId,
-                              ]),
-                            ).entries(),
-                          ).map(([id, name]) => (
-                            <option key={id} value={id}>
-                              {name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <select
+                        value={activityProjectFilter}
+                        onChange={(e) => setActivityProjectFilter(e.target.value)}
+                        className="bg-blue-50/20 border border-blue-200/30 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
+                      >
+                        <option value="" className="text-gray-900">Tous les projets</option>
+                        {Array.from(
+                          new Map(
+                            allActivities.map((a) => [
+                              a.projectId,
+                              a.projectName || a.projectId,
+                            ]),
+                          ).entries(),
+                        ).map(([id, name]) => (
+                          <option key={id} value={id} className="text-gray-900">
+                            {name}
+                          </option>
+                        ))}
+                      </select>
 
-                      {/* Filtre statut */}
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-semibold text-gray-600">Statut:</span>
-                        <select
-                          value={activityStatusFilter}
-                          onChange={(e) => setActivityStatusFilter(e.target.value)}
-                          className="border border-gray-300 rounded-md py-1 px-2 text-[11px] focus:ring-[#002060] focus:border-[#002060] bg-white"
-                        >
-                          <option value="">Tous</option>
-                          <option value="upcoming">À venir</option>
-                          <option value="completed">Complété</option>
-                        </select>
-                      </div>
+                      <select
+                        value={activityStatusFilter}
+                        onChange={(e) => setActivityStatusFilter(e.target.value)}
+                        className="bg-blue-50/20 border border-blue-200/30 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
+                      >
+                        <option value="" className="text-gray-900">Tous les statuts</option>
+                        <option value="upcoming" className="text-gray-900">À venir</option>
+                        <option value="completed" className="text-gray-900">Complété</option>
+                      </select>
 
                       <ActionButton
                         variant="secondary"
                         disabled={allActivitiesLoading}
                         onClick={async () => {
                           const popup = window.open('', '_blank');
-                          
                           if (!popup) {
                             alert('Le navigateur a bloqué la fenêtre de téléchargement. Veuillez autoriser les pop-ups.');
                             return;
                           }
-
-                          popup.document.write('<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;"><h3>Génération du PDF en cours...<br>Veuillez patienter...</h3></body></html>');
-
+                          popup.document.write('<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#002060;color:white;"><h3>Génération du PDF en cours...<br>Veuillez patienter...</h3></body></html>');
                           try {
                             const q = activitySearch.trim();
                             const res = await adminListActivitiesPaged(1, 5000, q);
@@ -1175,108 +1372,214 @@ export const AdminPanel: React.FC = () => {
                             popup.document.body.innerHTML = '<h3 style="color:red">Erreur lors de la récupération des données.</h3>';
                           }
                         }}
+                        className="bg-white/10 hover:bg-white/20 text-white border border-white/20"
                       >
-                        <Download className="h-3.5 w-3.5 text-gray-600" />
+                        <Download className="h-4 w-4" />
                       </ActionButton>
                     </div>
-                  }
-                />
+                  </div>
+                </div>
 
-                {allActivitiesLoading ? (
-                  <div className="text-center py-10 text-gray-400 text-xs animate-pulse">Chargement des activités...</div>
-                ) : allActivities.length === 0 ? (
-                  <div className="text-center py-10 text-gray-400 text-xs bg-gray-50 rounded-lg">Aucune activité trouvée.</div>
-                ) : (
-                  (() => {
-                    const totalPages = Math.max(1, Math.ceil(activityTotal / activityPageSize));
-                    const currentPage = Math.min(activityPage, totalPages);
-                    const baseActivities = allActivities;
-                    const filteredByProject = activityProjectFilter
-                      ? baseActivities.filter((a) => a.projectId === activityProjectFilter)
-                      : baseActivities;
-                    const filteredByStatus = activityStatusFilter
-                      ? filteredByProject.filter((a) => {
-                          const hasDate = !!a.date;
-                          let isCompleted = false;
-                          if (hasDate) {
-                            const d = new Date(a.date);
-                            const t = new Date();
-                            t.setHours(0, 0, 0, 0);
-                            d.setHours(0, 0, 0, 0);
-                            isCompleted = d < t;
-                          }
-                          if (activityStatusFilter === 'completed') return isCompleted;
-                          if (activityStatusFilter === 'upcoming') return !isCompleted;
-                          return true;
-                        })
-                      : filteredByProject;
-                    const visible = filteredByStatus;
+                <div className="p-6">
+                  {allActivitiesLoading ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#002060] mb-4"></div>
+                      <p className="text-gray-500 text-sm">Chargement des activités...</p>
+                    </div>
+                  ) : allActivities.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl">📋</span>
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-700 mb-2">Aucune activité trouvée</h3>
+                      <p className="text-gray-500 text-sm">Aucune activité n'a été enregistrée par les partenaires.</p>
+                    </div>
+                  ) : (
+                    (() => {
+                      const totalPages = Math.max(1, Math.ceil(activityTotal / activityPageSize));
+                      const currentPage = Math.min(activityPage, totalPages);
+                      const baseActivities = allActivities;
+                      const filteredByProject = activityProjectFilter
+                        ? baseActivities.filter((a) => a.projectId === activityProjectFilter)
+                        : baseActivities;
+                      const filteredByStatus = activityStatusFilter
+                        ? filteredByProject.filter((a) => {
+                            const hasDate = !!a.date;
+                            let isCompleted = false;
+                            if (hasDate) {
+                              const d = new Date(a.date);
+                              const t = new Date(); 
+                              t.setHours(0, 0, 0, 0); 
+                              d.setHours(0, 0, 0, 0);
+                              isCompleted = d < t;
+                            }
+                            if (activityStatusFilter === 'completed') return isCompleted;
+                            if (activityStatusFilter === 'upcoming') return !isCompleted;
+                            return true;
+                          })
+                        : filteredByProject;
+                      const visible = filteredByStatus;
 
-                    return (
-                      <>
-                        <div className="flex items-center justify-between text-[10px] text-gray-500 mb-2 px-1">
-                          <span>Affichage de {visible.length} sur {activityTotal} activités</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              disabled={currentPage <= 1}
-                              onClick={() => loadActivitiesPage(currentPage - 1, activitySearch)}
-                              className="hover:text-blue-700 disabled:opacity-40"
-                            >
-                              Précédent
-                            </button>
-                            <span>Page {currentPage} / {totalPages}</span>
-                            <button
-                              disabled={currentPage >= totalPages}
-                              onClick={() => loadActivitiesPage(currentPage + 1, activitySearch)}
-                              className="hover:text-blue-700 disabled:opacity-40"
-                            >
-                              Suivant
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-3">
-                          {visible.length === 0 ? (
-                            <div className="text-center text-xs text-gray-400 py-4">Aucun résultat.</div>
-                          ) : (
-                            visible.map((a) => {
-                              const hasDate = !!a.date;
-                              let isCompleted = false;
-                              if (hasDate) {
-                                const d = new Date(a.date);
-                                const t = new Date(); t.setHours(0, 0, 0, 0); d.setHours(0, 0, 0, 0);
-                                isCompleted = d < t;
-                              }
-
-                              return (
-                                <div key={a.id} className="group bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row gap-4 relative overflow-hidden">
-                                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${isCompleted ? 'bg-emerald-400' : 'bg-amber-400'}`}></div>
-                                  <div className="flex-1 pl-2">
-                                    <div className="flex items-start justify-between">
-                                      <h4 className="text-sm font-bold text-gray-900 group-hover:text-[#002060] transition-colors">{a.title}</h4>
-                                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${isCompleted ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
-                                        {isCompleted ? 'Complété' : 'À venir'}
-                                      </span>
-                                    </div>
-                                    <p className="text-[11px] text-gray-600 mt-1 mb-2 line-clamp-2">{a.description || <span className="italic text-gray-400">Pas de description</span>}</p>
-                                    <div className="flex flex-wrap gap-3 text-[10px] text-gray-500">
-                                      <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-100"><span className="font-bold text-gray-700">Org:</span> {a.orgName}</span>
-                                      <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-100"><span className="font-bold text-gray-700">Projet:</span> {a.projectId}</span>
-                                    </div>
-                                  </div>
-                                  <div className="flex flex-row sm:flex-col gap-3 sm:gap-1 text-[10px] text-gray-500 sm:w-40 sm:text-right sm:border-l sm:border-gray-100 sm:pl-4 justify-between sm:justify-center">
-                                    <div className="flex items-center sm:justify-end gap-1.5"><Calendar className="h-3.5 w-3.5 text-blue-800" /><span className="font-medium">{a.date || 'N/A'}</span></div>
-                                    <div className="flex items-center sm:justify-end gap-1.5"><MapPin className="h-3.5 w-3.5 text-blue-800" /><span className="font-medium">{a.location || 'N/A'}</span></div>
-                                  </div>
+                      return (
+                        <>
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="bg-blue-50 px-3 py-1 rounded-full">
+                                <span className="text-sm font-semibold text-blue-700">
+                                  {visible.length} sur {activityTotal} activités
+                                </span>
+                              </div>
+                              {activitySearch && (
+                                <div className="bg-amber-50 px-3 py-1 rounded-full">
+                                  <span className="text-sm font-semibold text-amber-700">
+                                    Recherche: "{activitySearch}"
+                                  </span>
                                 </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </>
-                    );
-                  })()
-                )}
+                              )}
+                              {activityProjectFilter && (
+                                <div className="bg-purple-50 px-3 py-1 rounded-full">
+                                  <span className="text-sm font-semibold text-purple-700">
+                                    Projet: {allActivities.find(a => a.projectId === activityProjectFilter)?.projectName || activityProjectFilter}
+                                  </span>
+                                </div>
+                              )}
+                              {activityStatusFilter && (
+                                <div className={`${activityStatusFilter === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'} px-3 py-1 rounded-full`}>
+                                  <span className="text-sm font-semibold">
+                                    {activityStatusFilter === 'completed' ? 'Complétées' : 'À venir'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                disabled={currentPage <= 1}
+                                onClick={() => loadActivitiesPage(currentPage - 1, activitySearch)}
+                                className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                ← Précédent
+                              </button>
+                              <span className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg">
+                                Page {currentPage} / {totalPages}
+                              </span>
+                              <button
+                                disabled={currentPage >= totalPages}
+                                onClick={() => loadActivitiesPage(currentPage + 1, activitySearch)}
+                                className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                Suivant →
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4">
+                            {visible.length === 0 ? (
+                              <div className="text-center py-8 bg-gray-50 rounded-lg">
+                                <span className="text-2xl mb-2 block">🔍</span>
+                                <p className="text-gray-500 text-sm">Aucune activité ne correspond à vos critères de recherche.</p>
+                              </div>
+                            ) : (
+                              visible.map((a) => {
+                                const hasDate = !!a.date;
+                                let isCompleted = false;
+                                if (hasDate) {
+                                  const d = new Date(a.date);
+                                  const t = new Date(); 
+                                  t.setHours(0, 0, 0, 0); 
+                                  d.setHours(0, 0, 0, 0);
+                                  isCompleted = d < t;
+                                }
+
+                                return (
+                                  <div
+                                    key={a.id}
+                                    className="group bg-white border border-gray-200 rounded-xl hover:shadow-lg hover:border-[#002060]/20 transition-all duration-200 overflow-hidden"
+                                  >
+                                    <div className="flex">
+                                      {/* Status indicator bar */}
+                                      <div className={`w-2 ${isCompleted ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+                                      
+                                      <div className="flex-1 p-6">
+                                        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                                          <div className="flex-1 min-w-0">
+                                            {/* Header with title and status */}
+                                            <div className="flex items-start gap-3 mb-3">
+                                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                                isCompleted 
+                                                  ? 'bg-emerald-100 text-emerald-600' 
+                                                  : 'bg-amber-100 text-amber-600'
+                                              }`}>
+                                                {isCompleted ? (
+                                                  <span className="text-lg">✓</span>
+                                                ) : (
+                                                  <Calendar className="h-5 w-5" />
+                                                )}
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#002060] transition-colors mb-1">
+                                                  {a.title}
+                                                </h3>
+                                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                  <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                                                    isCompleted 
+                                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                  }`}>
+                                                    {isCompleted ? 'Complété' : 'À venir'}
+                                                  </span>
+                                                  <span className="text-gray-400">•</span>
+                                                  <span className="text-sm text-gray-600 font-medium">{a.orgName}</span>
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            {/* Description */}
+                                            {a.description && (
+                                              <p className="text-sm text-gray-600 mb-3 line-clamp-2 leading-relaxed">
+                                                {a.description}
+                                              </p>
+                                            )}
+
+                                            {/* Metadata badges */}
+                                            <div className="flex flex-wrap gap-2">
+                                              <div className="inline-flex items-center gap-1 bg-gray-50 px-3 py-1 rounded-lg border border-gray-200">
+                                                <span className="text-xs font-semibold text-gray-500">PROJET:</span>
+                                                <span className="text-xs font-medium text-gray-900">{a.projectName || a.projectId}</span>
+                                              </div>
+                                              {a.date && (
+                                                <div className="inline-flex items-center gap-1 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200">
+                                                  <Calendar className="h-3 w-3 text-blue-600" />
+                                                  <span className="text-xs font-medium text-blue-900">{a.date}</span>
+                                                </div>
+                                              )}
+                                              {a.location && (
+                                                <div className="inline-flex items-center gap-1 bg-purple-50 px-3 py-1 rounded-lg border border-purple-200">
+                                                  <MapPin className="h-3 w-3 text-purple-600" />
+                                                  <span className="text-xs font-medium text-purple-900">{a.location}</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          {/* Action buttons */}
+                                          <div className="flex lg:flex-col gap-2 lg:gap-1">
+                                            <button className="p-2 text-gray-400 hover:text-[#002060] hover:bg-gray-50 rounded-lg transition-colors">
+                                              <span className="text-lg">ℹ️</span>
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()
+                  )}
+                </div>
               </section>
             </div>
           )}
@@ -1285,4 +1588,4 @@ export const AdminPanel: React.FC = () => {
       </main>
     </PublicLayout>
   );
-};
+}; 

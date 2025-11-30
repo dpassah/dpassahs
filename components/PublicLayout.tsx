@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Phone, Mail, Facebook, Globe, Calendar, MapPin } from 'lucide-react';
+import { Phone, Mail, Facebook, Globe, Calendar, MapPin, Menu, X } from 'lucide-react';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -9,6 +9,7 @@ interface PublicLayoutProps {
 
 export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, adminHeader, adminTabs }) => {
   const [hasOrgSession, setHasOrgSession] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -30,20 +31,20 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, adminHeade
   return (
     <div className="min-h-screen bg-white font-sans text-gray-800 flex flex-col">
       {/* 1. Top Bar (Contact Info) */}
-      <div className="bg-[#002060] text-white py-2 text-xs border-b border-[#001540]">
+      <div className="bg-[#002060] text-white py-2 text-xs border-b border-[#001540] animate-fadeInDown relative z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-2">
           <div className="flex items-center space-x-4">
-            <div className="flex items-center hover:text-yellow-400 transition-colors">
+            <div className="flex items-center hover:text-yellow-400 transition-colors duration-300 hover:scale-105 transform origin-left cursor-default">
               <Phone className="h-3 w-3 mr-1" />
               <span>+235 66 00 00 00</span>
             </div>
-            <div className="flex items-center hover:text-yellow-400 transition-colors">
+            <div className="flex items-center hover:text-yellow-400 transition-colors duration-300 hover:scale-105 transform origin-left cursor-default">
               <Mail className="h-3 w-3 mr-1" />
               <span>dpassahs@gmail.com</span>
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="flex items-center text-blue-200">
+            <span className="flex items-center text-blue-200 hover:text-white transition-colors duration-300">
               <Calendar className="h-3 w-3 mr-1" />
               {new Date().toLocaleDateString('fr-FR', {
                 weekday: 'long',
@@ -57,39 +58,41 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, adminHeade
                 href="https://www.facebook.com/share/1A2M37Xd3o/"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex"
+                className="inline-flex hover:scale-125 transition-transform duration-300"
               >
                 <Facebook className="h-3 w-3 hover:text-yellow-400 cursor-pointer" />
               </a>
-              <Globe className="h-3 w-3 hover:text-yellow-400 cursor-pointer" />
+              <div className="inline-flex hover:scale-125 transition-transform duration-300">
+                <Globe className="h-3 w-3 hover:text-yellow-400 cursor-pointer" />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* 2. Official Header */}
-      <header className="bg-white py-4 relative shadow-sm">
+      <header className="bg-white py-4 relative shadow-sm z-40">
         {/* Tchad Flag Strip */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#002664] via-[#FECB00] to-[#C60C30]" />
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#002664] via-[#FECB00] to-[#C60C30] animate-pulse" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Logo & Text Left */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 animate-fadeInLeft delay-100">
             <img
               src="/logo-sila.png"
               alt="Logo Sila"
-              className="h-16 w-16 object-contain"
+              className="h-16 w-16 object-contain hover:rotate-3 transition-transform duration-500"
             />
             <div className="text-center md:text-left">
               <h1 className="text-sm font-bold text-gray-500 uppercase tracking-widest">République du Tchad</h1>
               <h2 className="text-xs text-[#C60C30] font-bold uppercase tracking-wider mb-1">Unité - Travail - Progrès</h2>
-              <h3 className="text-lg font-extrabold text-[#002060] leading-none">PROVINCE DE SILA</h3>
+              <h3 className="text-lg font-extrabold text-[#002060] leading-none hover:text-[#C60C30] transition-colors duration-300">PROVINCE DE SILA</h3>
             </div>
           </div>
 
           {/* Ministry Title Right */}
-          <div className="hidden md:block text-right">
-            <h4 className="text-sm font-bold text-[#002060] max-w-md uppercase leading-tight">
+          <div className="hidden md:block text-right animate-fadeInRight delay-100">
+            <h4 className="text-sm font-bold text-[#002060] max-w-md uppercase leading-tight hover:scale-105 transition-transform duration-500 origin-right">
               Délégation Provinciale de l'Action Sociale,<br /> de la Solidarité et des Affaires Humanitaires
             </h4>
           </div>
@@ -97,34 +100,82 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, adminHeade
       </header>
 
       {/* 3. Navigation Bar (public) */}
-      <nav className="bg-[#002060] text-white shadow-md sticky top-0 z-50 border-t border-blue-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-12 gap-4">
-          <div className="flex items-center overflow-x-auto whitespace-nowrap">
-            <a href="/" className="px-4 py-3 bg-[#003da5] font-semibold text-sm hover:bg-[#C60C30] transition-colors border-r border-blue-800">
-              ACCUEIL
-            </a>
-            <a href="/a-propos" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-colors border-r border-blue-800">
-              A PROPOS
-            </a>
-            <a href="/partenaires" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-colors border-r border-blue-800">
-              NOS PARTENAIRES
-            </a>
-            {hasOrgSession && (
-              <a href="/#/org/panel" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-colors border-r border-blue-800">
-                DUDSHARD PARENAIRE
-              </a>
-            )}
-            <a href="/projets" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-colors border-r border-blue-800">
-              PROJETS & SUIVI
-            </a>
-            <a href="/statistiques" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-colors border-r border-blue-800">
-              STATISTIQUES
-            </a>
-            <a href="/contact" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-colors">
-              CONTACT
-            </a>
+      <nav className="bg-[#002060] text-white shadow-md sticky top-0 z-50 border-t border-blue-900 animate-fadeInDown delay-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-12">
+            
+            {/* Desktop Menu (Original) */}
+            <div className="hidden md:flex items-center overflow-x-auto whitespace-nowrap gap-4 w-full">
+              <div className="flex items-center overflow-x-auto whitespace-nowrap">
+                <a href="/" className="px-4 py-3 bg-[#003da5] font-semibold text-sm hover:bg-[#C60C30] transition-all duration-300 border-r border-blue-800 hover:tracking-wide">
+                  ACCUEIL
+                </a>
+                <a href="/a-propos" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-all duration-300 border-r border-blue-800 hover:-translate-y-0.5">
+                  A PROPOS
+                </a>
+                <a href="/partenaires" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-all duration-300 border-r border-blue-800 hover:-translate-y-0.5">
+                  NOS PARTENAIRES
+                </a>
+                {hasOrgSession && (
+                  <a href="/#/org/panel" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-all duration-300 border-r border-blue-800 hover:-translate-y-0.5">
+                    DUDSHARD PARENAIRE
+                  </a>
+                )}
+                <a href="/projets" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-all duration-300 border-r border-blue-800 hover:-translate-y-0.5">
+                  PROJETS & SUIVI
+                </a>
+                <a href="/statistiques" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-all duration-300 border-r border-blue-800 hover:-translate-y-0.5">
+                  STATISTIQUES
+                </a>
+                <a href="/contact" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] transition-all duration-300 hover:-translate-y-0.5">
+                  CONTACT
+                </a>
+              </div>
+            </div>
+
+            {/* Mobile Header & Toggle */}
+            <div className="md:hidden flex items-center justify-between w-full">
+              <span className="font-bold text-sm tracking-widest pl-2">MENU</span>
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="p-2 text-white hover:bg-blue-800 rounded-md transition-colors"
+              >
+                {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Mobile Dropdown Menu */}
+        {isMenuOpen && (
+          <div className="md:hidden bg-[#001540] border-t border-blue-800 animate-fadeInDown">
+            <div className="flex flex-col">
+              <a href="/" className="px-4 py-3 bg-[#003da5] font-semibold text-sm hover:bg-[#C60C30] border-b border-blue-900">
+                ACCUEIL
+              </a>
+              <a href="/a-propos" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] border-b border-blue-900">
+                A PROPOS
+              </a>
+              <a href="/partenaires" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] border-b border-blue-900">
+                NOS PARTENAIRES
+              </a>
+              {hasOrgSession && (
+                <a href="/#/org/panel" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] border-b border-blue-900">
+                  DUDSHARD PARENAIRE
+                </a>
+              )}
+              <a href="/projets" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] border-b border-blue-900">
+                PROJETS & SUIVI
+              </a>
+              <a href="/statistiques" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] border-b border-blue-900">
+                STATISTIQUES
+              </a>
+              <a href="/contact" className="px-4 py-3 font-medium text-sm hover:bg-[#FECB00] hover:text-[#002060] border-b border-blue-900">
+                CONTACT
+              </a>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* 3bis. Admin Tabs Bar (only when adminTabs provided) */}

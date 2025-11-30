@@ -694,9 +694,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               &copy; 2025 Délégation de l'Action Sociale, de la Solidarité et des Affaires Humanitaires.
             </p>
             <div className="flex space-x-4 mt-2 md:mt-0">
-              <span>Province de Sila</span>
-              <span className="text-gray-300">|</span>
-              <span className="font-semibold">Tutelle: CNARR &amp; ONASA</span>
+              {/* Footer Info Removed */}
             </div>
           </div>
         </div>
