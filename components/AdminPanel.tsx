@@ -1262,6 +1262,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ initialSection }) => {
                                           const getImageUrl = (img: string) => {
                                             if (!img) return '';
                                             if (img.startsWith('http')) return img;
+                                            
+                                            if (import.meta.env.PROD) {
+                                                const cleanImg = img.startsWith('/') ? img.substring(1) : img;
+                                                if (cleanImg.startsWith('public/')) return `/api/${cleanImg}`;
+                                                return `/api/public/delegation-events/${cleanImg}`;
+                                            }
+
                                             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
                                             if (img.startsWith('/')) return `${baseUrl}${img}`;
                                             return `${baseUrl}/public/delegation-events/${img}`;
