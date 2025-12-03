@@ -1258,15 +1258,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ initialSection }) => {
                                     <div className="mb-3">
                                       <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Images</h4>
                                       <div className="flex flex-wrap gap-2">
-                                        {ev.images.map((image, index) => (
-                                          <img
-                                            key={index}
-                                            src={image.startsWith('http') ? image : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${image}`}
-                                            alt={`Activity image ${index + 1}`}
-                                            className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:border-[#002060]/30 transition-colors cursor-pointer"
-                                            onClick={() => window.open(image.startsWith('http') ? image : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${image}`, '_blank')}
-                                          />
-                                        ))}
+                                        {ev.images.map((image, index) => {
+                                          const getImageUrl = (img: string) => {
+                                            if (!img) return '';
+                                            if (img.startsWith('http')) return img;
+                                            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+                                            if (img.startsWith('/')) return `${baseUrl}${img}`;
+                                            return `${baseUrl}/public/delegation-events/${img}`;
+                                          };
+                                          const imageUrl = getImageUrl(image);
+                                          return (
+                                            <img
+                                              key={index}
+                                              src={imageUrl}
+                                              alt={`Activity image ${index + 1}`}
+                                              className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:border-[#002060]/30 transition-colors cursor-pointer"
+                                              onClick={() => window.open(imageUrl, '_blank')}
+                                              onError={(e) => {
+                                                e.currentTarget.src = 'https://via.placeholder.com/150?text=Error';
+                                              }}
+                                            />
+                                          );
+                                        })}
                                       </div>
                                     </div>
                                   )}
