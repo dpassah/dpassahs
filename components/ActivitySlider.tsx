@@ -46,33 +46,46 @@ const ActivitySlider: React.FC<ActivitySliderProps> = ({ activities, onActivityC
     if (!image) return null;
 
     // If it's an array, take the first image
-    if (Array.isArray(image)) {
-      return image[0];
+    let imgStr = Array.isArray(image) ? image[0] : image;
+    
+    if (typeof imgStr !== 'string') return null;
+
+    if (imgStr.startsWith('http')) {
+      return imgStr;
     }
 
-    // If it's a string, check if it's already a full URL or starts with /public/
-    if (typeof image === 'string') {
-      if (image.startsWith('http')) {
-        return image;
-      }
-
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000');
-
-      if (image.startsWith('/public/')) {
-        return `${API_BASE_URL}${image}`;
-      }
-
-      // If it's just a filename, prepend the public path
-      return `${API_BASE_URL}/public/delegation-events/${image}`;
+    // Fix for production: force /api prefix for backend static files
+    if (import.meta.env.PROD) {
+        const cleanImg = imgStr.startsWith('/') ? imgStr.substring(1) : imgStr;
+        if (cleanImg.startsWith('public/')) return `/api/${cleanImg}`;
+        return `/api/public/delegation-events/${cleanImg}`;
     }
 
-    return null;
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
+    if (imgStr.startsWith('/public/')) {
+      return `${API_BASE_URL}${imgStr}`;
+    }
+    
+    if (imgStr.startsWith('/')) {
+        return `${API_BASE_URL}${imgStr}`;
+    }
+
+    // If it's just a filename, prepend the public path
+    return `${API_BASE_URL}/public/delegation-events/${imgStr}`;
   };
 
   const getFullImageUrl = (image: string) => {
     if (!image) return '';
     if (image.startsWith('http')) return image;
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000');
+    
+    if (import.meta.env.PROD) {
+        const cleanImg = image.startsWith('/') ? image.substring(1) : image;
+        if (cleanImg.startsWith('public/')) return `/api/${cleanImg}`;
+        return `/api/public/delegation-events/${cleanImg}`;
+    }
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
     if (image.startsWith('/public/')) return `${API_BASE_URL}${image}`;
     return `${API_BASE_URL}/public/delegation-events/${image}`;
   };
