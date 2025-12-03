@@ -300,7 +300,15 @@ export const Home: React.FC = () => {
   const getFullImageUrl = (image: string | null | undefined) => {
     if (!image) return '';
     if (image.startsWith('http')) return image;
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000');
+    
+    // Fix for production: force /api prefix for backend static files
+    if (import.meta.env.PROD) {
+        const cleanImg = image.startsWith('/') ? image.substring(1) : image;
+        if (cleanImg.startsWith('public/')) return `/api/${cleanImg}`;
+        return `/api/public/delegation-events/${cleanImg}`;
+    }
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
     
     // Clean up double slashes if needed
     if (image.startsWith('/')) {
