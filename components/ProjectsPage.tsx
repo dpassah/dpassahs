@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { X, Calendar, MapPin, Info } from 'lucide-react';
 import { PublicLayout } from './PublicLayout';
-import { listPublicProjectsWithActivities, PublicProjectWithActivities } from '../services/api';
+import { listPublicProjectsWithActivities, PublicProjectWithActivities, adminListDelegationEvents, DelegationEvent } from '../services/api';
 
 export const ProjectsPage: React.FC = () => {
   const [items, setItems] = useState<PublicProjectWithActivities[]>([]);
@@ -8,7 +9,20 @@ export const ProjectsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Vue: projets (actuelle) ou activités (toutes les activités avec filtres)
-  const [viewMode, setViewMode] = useState<'projects' | 'activities'>('projects');
+  const [viewMode, setViewMode] = useState<'projects' | 'activities' | 'delegation'>('projects');
+  const [delegationEvents, setDelegationEvents] = useState<DelegationEvent[]>([]);
+  const [selectedDelegationEvent, setSelectedDelegationEvent] = useState<DelegationEvent | null>(null);
+  const [visibleDelegationCount, setVisibleDelegationCount] = useState(6);
+  const [filterDelegationDate, setFilterDelegationDate] = useState('');
+
+  const filteredDelegationEvents = useMemo(() => {
+    return delegationEvents.filter(ev => {
+      if (!filterDelegationDate) return true;
+      return ev.date === filterDelegationDate;
+    });
+  }, [delegationEvents, filterDelegationDate]);
+
+  const displayedDelegationEvents = filteredDelegationEvents.slice(0, visibleDelegationCount);
 
   // Filtres pour la vue activités
   const [filterLocation, setFilterLocation] = useState('');
@@ -28,8 +42,12 @@ export const ProjectsPage: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await listPublicProjectsWithActivities();
+        const [data, delegationData] = await Promise.all([
+          listPublicProjectsWithActivities(),
+          adminListDelegationEvents()
+        ]);
         setItems(data);
+        setDelegationEvents(delegationData);
       } catch (err: any) {
         setError(err?.message || 'Erreur lors du chargement des projets.');
       } finally {
@@ -129,9 +147,96 @@ export const ProjectsPage: React.FC = () => {
     [allActivities, filterLocation, filterGov, filterStatus],
   );
 
+
+  // Helper for image URLs
+  const getFullImageUrl = (image: string | null | undefined) => {
+    if (!image) return '';
+    if (image.startsWith('http')) return image;
+    
+    if (import.meta.env.PROD) {
+        const cleanImg = image.startsWith('/') ? image.substring(1) : image;
+        if (cleanImg.startsWith('public/')) return `/api/${cleanImg}`;
+        return `/api/public/delegation-events/${cleanImg}`;
+    }
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    
+    if (image.startsWith('/')) {
+        return `${API_BASE_URL}${image}`;
+    }
+    return `${API_BASE_URL}/public/delegation-events/${image}`;
+  };
+
   return (
     <PublicLayout>
       <main className="flex-1 bg-slate-50 min-h-screen">
+        {selectedDelegationEvent && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm transition-opacity animate-fadeIn"
+            onClick={() => setSelectedDelegationEvent(null)}
+          >
+            <div
+              className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative animate-zoomIn"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
+                <div>
+                  <h3 className="text-lg font-bold text-[#002060] line-clamp-1">{selectedDelegationEvent.title}</h3>
+                  <p className="text-xs text-gray-500">Délégation Provinciale - SILA</p>
+                </div>
+                <button
+                  onClick={() => setSelectedDelegationEvent(null)}
+                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto p-6">
+                {selectedDelegationEvent.images && selectedDelegationEvent.images.length > 0 && (
+                  <div className={`grid gap-4 mb-6 ${
+                      selectedDelegationEvent.images.length === 1 ? 'grid-cols-1' :
+                      selectedDelegationEvent.images.length === 2 ? 'grid-cols-2' :
+                      'grid-cols-2 md:grid-cols-3'
+                    }`}>
+                    {selectedDelegationEvent.images.map((img, idx) => (
+                      <div key={idx} className={`relative rounded-lg overflow-hidden shadow-sm ${
+                        (idx === 0 && selectedDelegationEvent.images.length > 3) ? 'col-span-full md:col-span-2 md:row-span-2' : ''
+                        }`}>
+                        <img
+                          src={getFullImageUrl(img)}
+                          alt={`Galerie ${idx + 1}`}
+                          className="w-full h-full object-cover min-h-[200px] hover:scale-105 transition-transform duration-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3 mb-6">
+                  {selectedDelegationEvent.date && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                      <Calendar className="w-3 h-3 mr-1.5" />
+                      {selectedDelegationEvent.date}
+                    </span>
+                  )}
+                  {selectedDelegationEvent.location && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700">
+                      <MapPin className="w-3 h-3 mr-1.5" />
+                      {selectedDelegationEvent.location}
+                    </span>
+                  )}
+                </div>
+
+                <div className="prose prose-sm max-w-none text-gray-600">
+                  <p className="whitespace-pre-wrap leading-relaxed">
+                    {selectedDelegationEvent.description || "Aucune description détaillée disponible pour cette activité."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
           {/* Header */}
           <header className="flex flex-col items-center justify-center text-center gap-3">
@@ -183,6 +288,17 @@ export const ProjectsPage: React.FC = () => {
                     }`}
                   >
                     Vue par activités
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('delegation')}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-colors ${
+                      viewMode === 'delegation'
+                        ? 'bg-[#002060] text-white shadow'
+                        : 'text-gray-600 hover:text-[#002060] hover:bg-gray-50'
+                    }`}
+                  >
+                    Activités de la Délégation
                   </button>
                 </div>
               </div>
@@ -238,7 +354,27 @@ export const ProjectsPage: React.FC = () => {
                             .filter((part) => part.length > 0);
                         })();
 
-                        return (
+                      
+  // Helper for image URLs
+  const getFullImageUrl = (image: string | null | undefined) => {
+    if (!image) return '';
+    if (image.startsWith('http')) return image;
+    
+    if (import.meta.env.PROD) {
+        const cleanImg = image.startsWith('/') ? image.substring(1) : image;
+        if (cleanImg.startsWith('public/')) return `/api/${cleanImg}`;
+        return `/api/public/delegation-events/${cleanImg}`;
+    }
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    
+    if (image.startsWith('/')) {
+        return `${API_BASE_URL}${image}`;
+    }
+    return `${API_BASE_URL}/public/delegation-events/${image}`;
+  };
+
+  return (
                           <div
                             key={item.project.id}
                             className="group bg-white rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 overflow-hidden transition-all duration-300"
@@ -375,7 +511,27 @@ export const ProjectsPage: React.FC = () => {
                                               label: null,
                                             };
 
-                                      return (
+                                    
+  // Helper for image URLs
+  const getFullImageUrl = (image: string | null | undefined) => {
+    if (!image) return '';
+    if (image.startsWith('http')) return image;
+    
+    if (import.meta.env.PROD) {
+        const cleanImg = image.startsWith('/') ? image.substring(1) : image;
+        if (cleanImg.startsWith('public/')) return `/api/${cleanImg}`;
+        return `/api/public/delegation-events/${cleanImg}`;
+    }
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    
+    if (image.startsWith('/')) {
+        return `${API_BASE_URL}${image}`;
+    }
+    return `${API_BASE_URL}/public/delegation-events/${image}`;
+  };
+
+  return (
                                         <div
                                           key={act.id}
                                           className="relative flex flex-col justify-between p-4 rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-blue-100 transition-all group/card cursor-pointer"
@@ -408,7 +564,27 @@ export const ProjectsPage: React.FC = () => {
                                                           month: 'short',
                                                           year: 'numeric',
                                                         });
-                                                    return (
+                                                  
+  // Helper for image URLs
+  const getFullImageUrl = (image: string | null | undefined) => {
+    if (!image) return '';
+    if (image.startsWith('http')) return image;
+    
+    if (import.meta.env.PROD) {
+        const cleanImg = image.startsWith('/') ? image.substring(1) : image;
+        if (cleanImg.startsWith('public/')) return `/api/${cleanImg}`;
+        return `/api/public/delegation-events/${cleanImg}`;
+    }
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    
+    if (image.startsWith('/')) {
+        return `${API_BASE_URL}${image}`;
+    }
+    return `${API_BASE_URL}/public/delegation-events/${image}`;
+  };
+
+  return (
                                                       <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-600 bg-gray-50 px-2 py-0.5 rounded-md mt-1">
                                                         <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`}></span>
                                                         {label}
@@ -564,7 +740,27 @@ export const ProjectsPage: React.FC = () => {
                           });
                         })();
 
-                        return (
+                      
+  // Helper for image URLs
+  const getFullImageUrl = (image: string | null | undefined) => {
+    if (!image) return '';
+    if (image.startsWith('http')) return image;
+    
+    if (import.meta.env.PROD) {
+        const cleanImg = image.startsWith('/') ? image.substring(1) : image;
+        if (cleanImg.startsWith('public/')) return `/api/${cleanImg}`;
+        return `/api/public/delegation-events/${cleanImg}`;
+    }
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    
+    if (image.startsWith('/')) {
+        return `${API_BASE_URL}${image}`;
+    }
+    return `${API_BASE_URL}/public/delegation-events/${image}`;
+  };
+
+  return (
                           <div
                             key={act.id}
                             onClick={() => {
@@ -632,6 +828,112 @@ export const ProjectsPage: React.FC = () => {
                         );
                       })}
                     </div>
+                  )}
+                </section>
+              )}
+
+              {viewMode === 'delegation' && (
+                <section className="space-y-6">
+                  <div className="flex items-center justify-center space-x-4 mb-2">
+                    <span className="h-px w-8 sm:w-16 bg-gray-300" />
+                    <h2 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] text-center">
+                      Activités officielles
+                    </h2>
+                    <span className="h-px w-8 sm:w-16 bg-gray-300" />
+                  </div>
+
+                  {/* Filter */}
+                  <div className="flex justify-end mb-4">
+                    <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
+                        <label className="text-xs font-semibold text-gray-600">Filtrer par date:</label>
+                        <input 
+                            type="date" 
+                            value={filterDelegationDate} 
+                            onChange={(e) => setFilterDelegationDate(e.target.value)}
+                            className="text-xs border-gray-300 rounded border px-2 py-1"
+                        />
+                        {filterDelegationDate && (
+                            <button onClick={() => setFilterDelegationDate('')} className="text-xs text-red-500 font-bold px-2">X</button>
+                        )}
+                    </div>
+                  </div>
+
+                  {filteredDelegationEvents.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 bg-white rounded-3xl border border-dashed border-gray-200 text-center px-4">
+                      <p className="text-gray-500 font-medium text-sm">Aucune activité trouvée.</p>
+                    </div>
+                  ) : (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {displayedDelegationEvents.map((ev) => {
+                            const mainImage = ev.images && ev.images.length > 0 ? ev.images[0] : null;
+                            const imageUrl = getFullImageUrl(mainImage);
+                            
+                            return (
+                            <div 
+                                key={ev.id} 
+                                className="bg-white rounded-xl shadow-sm hover:shadow-md border border-gray-100 overflow-hidden transition-all group flex flex-col h-full cursor-pointer"
+                                onClick={() => setSelectedDelegationEvent(ev)}
+                            >
+                                {imageUrl ? (
+                                <div className="h-48 overflow-hidden relative">
+                                    <img
+                                    src={imageUrl}
+                                    alt={ev.title}
+                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
+                                    <div className="absolute bottom-3 left-3 right-3 text-white">
+                                    {ev.location && (
+                                        <div className="flex items-center gap-1 text-xs font-medium mb-1">
+                                        <span>📍</span> {ev.location}
+                                        </div>
+                                    )}
+                                    </div>
+                                </div>
+                                ) : (
+                                <div className="h-32 bg-gray-50 flex items-center justify-center text-gray-400">
+                                    <span className="text-xs">Pas d'image</span>
+                                </div>
+                                )}
+                                
+                                <div className="p-5 flex-1 flex flex-col">
+                                <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                                    {ev.date && (
+                                    <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium">
+                                        {ev.date}
+                                    </span>
+                                    )}
+                                    <span className="text-gray-300">•</span>
+                                    <span className="font-semibold text-gray-400 uppercase tracking-wider">Délégation</span>
+                                </div>
+                                
+                                <h3 className="text-lg font-bold text-[#002060] mb-2 line-clamp-2 group-hover:text-blue-700 transition-colors">
+                                    {ev.title}
+                                </h3>
+                                
+                                {ev.description && (
+                                    <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed mb-4 flex-1">
+                                    {ev.description}
+                                    </p>
+                                )}
+                                </div>
+                            </div>
+                            );
+                        })}
+                        </div>
+                        
+                        {displayedDelegationEvents.length < filteredDelegationEvents.length && (
+                            <div className="flex justify-center mt-8">
+                                <button 
+                                    onClick={() => setVisibleDelegationCount(prev => prev + 6)}
+                                    className="px-6 py-2 bg-white border border-[#002060] text-[#002060] rounded-full font-bold text-sm hover:bg-blue-50 transition-colors shadow-sm"
+                                >
+                                    Afficher plus d'activités
+                                </button>
+                            </div>
+                        )}
+                    </>
                   )}
                 </section>
               )}
